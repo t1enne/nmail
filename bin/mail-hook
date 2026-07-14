@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# mail-hook — manually trigger hook scripts
+#
+# Usage: mail-hook <event> [args...]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-hook <event> [args...]
+
+Manually trigger hook scripts for an event.
+
+Events:
+  new, sent, error, sync-start, sync-end, draft, trash, archive, tag
+
+Hook scripts are in: ~/.config/nmail/hooks.d/
+EOF
+    exit 0
+}
+
+if [[ $# -lt 1 ]]; then
+    usage
+fi
+
+EVENT="$1"
+shift
+
+# Ensure event has mail: prefix if not already
+[[ "$EVENT" != mail:* ]] && EVENT="mail:$EVENT"
+
+log_event "$EVENT" "$@"
+
+echo "Fired: $EVENT"

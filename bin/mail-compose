@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# mail-compose — create or edit a mail draft
+#
+# Usage: mail-compose [--to ADDR] [--subject TEXT] [template|file]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+# ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+
+usage() {
+    cat <<'EOF'
+Usage: mail-compose [options] [template-name|draft-file]
+
+Create or edit a mail draft.
+
+Options:
+  --to ADDR         Pre-fill To: header
+  --cc ADDR         Pre-fill Cc: header
+  --bcc ADDR        Pre-fill Bcc: header
+  --subject TEXT    Pre-fill Subject: header
+  --attach FILE     Add attachment reference
+  --no-send         Don't queue after editing; keep as draft only
+  --queue           Queue immediately after saving (default)
+  --stdin           Read draft from stdin (non-interactive)
+  -h, --help        Show this help
+
+Without arguments, creates a new draft with default template.
+With template-name, uses ~/Mail/templates/<name>.md.
+With draft-file, edits existing file.
+EOF
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Parse args
+# ---------------------------------------------------------------------------
+
+TO=""
+CC=""
+BCC=""
+SUBJECT=""
+ATTACHMENTS=()
+NO_SEND=false
+FROM_STDIN=false
+TEMPLATE="default"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --to)       TO="$2"; shift 2 ;;
+        --to=*)     TO="${1#*=}"; shift ;;
+        --cc)       CC="$2"; shift 2 ;;
+        --cc=*)     CC="${1#*=}"; shift ;;
+        --bcc)      BCC="$2"; shift 2 ;;
+        --bcc=*)    BCC="${1#*=}"; shift ;;
+        --subject)  SUBJECT="$2"; shift 2 ;;
+        --subject=*) SUBJECT="${1#*=}"; shift ;;
+        --attach)   ATTACHMENTS+=("$2"); shift 2 ;;
+        --attach=*) ATTACHMENTS+=("${1#*=}"); shift ;;
+        --no-send)  NO_SEND=true; shift ;;
+        --queue)    NO_SEND=false; shift ;;
+        --stdin)    FROM_STDIN=true; shift ;;
+        -h|--help)  usage ;;
+        -*)
+            echo "mail-compose: unknown option: $1" >&2
+            usage
+            ;;
+        *)
+            # Could be template name or file
+            if [[ -f "$1" ]]; then
+                DRAFT_FILE="$1"
+            elif [[ -f "$NM_MAILDIR/templates/${1}.md" ]]; then
+                TEMPLATE="$1"
+            else
+                echo "mail-compose: template or file not found: $1" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Create draft from template
+# ---------------------------------------------------------------------------
+
+ensure_maildir
+
+DRAFT_FILE="${DRAFT_FILE:-$NM_MAILDIR/drafts/$(date +%Y%m%d-%H%M%S).md}"
+
+create_draft() {
+    local template_file="$NM_MAILDIR/templates/${TEMPLATE}.md"
+
+    if [[ -f "$template_file" ]]; then
+        cp "$template_file" "$DRAFT_FILE"
+    else
+        # Minimal default
+        cat > "$DRAFT_FILE" <<'DEFAULT'
+From: 
+To: 
+Cc: 
+Subject: 
+
+---
+
+DEFAULT
+    fi
+
+    # Set signature
+    local sig
+    sig=$(config_get general.signature)
+    if [[ -n "$sig" ]]; then
+        echo >> "$DRAFT_FILE"
+        echo "$sig" >> "$DRAFT_FILE"
+    fi
+
+    # Set From: if configured
+    if grep -q '^From: $' "$DRAFT_FILE" 2>/dev/null; then
+        local from
+        from="${MAIL_FROM:-$(config_get general.from_address)}"
+        [[ -n "$from" ]] && sed -i "s/^From: .*/From: $from/" "$DRAFT_FILE"
+    fi
+
+    # Pre-fill headers
+    [[ -n "$TO" ]] && sed -i "s/^To: .*/To: $TO/" "$DRAFT_FILE"
+    [[ -n "$CC" ]] && sed -i "s/^Cc: .*/Cc: $CC/" "$DRAFT_FILE"
+    [[ -n "$BCC" ]] && sed -i "s/^Bcc: .*/Bcc: $BCC/" "$DRAFT_FILE"
+    [[ -n "$SUBJECT" ]] && sed -i "s/^Subject: .*/Subject: $SUBJECT/" "$DRAFT_FILE"
+
+    # Add attachment references at end
+    if [[ ${#ATTACHMENTS[@]} -gt 0 ]]; then
+        echo >> "$DRAFT_FILE"
+        echo "---" >> "$DRAFT_FILE"
+        for a in "${ATTACHMENTS[@]}"; do
+            echo "$a" >> "$DRAFT_FILE"
+        done
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if $FROM_STDIN; then
+    # Read draft from stdin
+    cat > "$DRAFT_FILE"
+else
+    create_draft
+    open_editor "$DRAFT_FILE"
+fi
+
+# Validate
+if ! validate_draft "$DRAFT_FILE"; then
+    echo "Draft saved to: $DRAFT_FILE (NOT queued — fix errors and re-run)" >&2
+    exit 1
+fi
+
+# Queue or keep
+if $NO_SEND; then
+    echo "Draft saved to: $DRAFT_FILE" >&2
+    log_event "mail:draft" "$DRAFT_FILE"
+    exit 2
+else
+    queued=$(queue_draft "$DRAFT_FILE")
+    echo "Queued: $queued" >&2
+    exit 0
+fi

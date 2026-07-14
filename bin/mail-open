@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# mail-open — open a mail message in pager
+#
+# Usage: mail-open <id|path>
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-open [options] <id|path>
+
+Open a mail message in $PAGER.
+
+Options:
+  --headers-only   Show only headers
+  --raw            Show raw RFC822
+  -h, --help       Show this help
+EOF
+    exit 0
+}
+
+HEADERS_ONLY=false
+RAW=false
+ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --headers-only) HEADERS_ONLY=true; shift ;;
+        --raw)          RAW=true; shift ;;
+        -h|--help)      usage ;;
+        *)              ID="$1"; shift ;;
+    esac
+done
+
+if [[ -z "$ID" ]]; then
+    echo "mail-open: missing message ID or path" >&2
+    usage
+fi
+
+# Resolve ID to file path
+if [[ -f "$ID" ]]; then
+    FILE="$ID"
+else
+    FILE=$(resolve_id "$ID")
+    if [[ -z "$FILE" ]]; then
+        echo "mail-open: message not found: $ID" >&2
+        exit 1
+    fi
+fi
+
+# Mark as read if in new/
+mark_read "$FILE"
+
+# Determine pager
+PAGER_CMD="${MAIL_PAGER:-$(config_get general.pager)}"
+PAGER_CMD="${PAGER_CMD:-less}"
+
+if $RAW; then
+    cat "$FILE"
+elif $HEADERS_ONLY; then
+    sed '/^$/q' "$FILE"
+elif command -v bat &>/dev/null && [[ "$PAGER_CMD" == "bat"* ]]; then
+    bat --language=email --plain "$FILE"
+else
+    $PAGER_CMD "$FILE"
+fi

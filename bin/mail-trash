@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# mail-trash — move messages to trash or empty trash
+#
+# Usage: mail-trash <id...>
+#        mail-trash --empty [--force]
+#        mail-trash --age DAYS [--force]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+source "${NM_LIBDIR}/maildir.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-trash <id...>
+       ... | mail-trash -
+       mail-trash --empty [--force]
+       mail-trash --age DAYS [--force]
+
+Move message(s) to trash/cur/, or manage trash.
+EOF
+    exit 0
+}
+
+EMPTY=false
+AGE=""
+FORCE=false
+IDS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --empty) EMPTY=true; shift ;;
+        --age)   AGE="$2"; shift 2 ;;
+        --age=*) AGE="${1#*=}"; shift ;;
+        --force) FORCE=true; shift ;;
+        -h|--help) usage ;;
+        *) IDS+=("$1"); shift ;;
+    esac
+done
+
+ensure_maildir
+TRASH_CUR="$NM_MAILDIR/trash/cur"
+mkdir -p "$TRASH_CUR"
+
+# --empty: remove all trash
+if $EMPTY; then
+    count=$(find "$TRASH_CUR" -type f 2>/dev/null | wc -l)
+    if [[ $count -eq 0 ]]; then
+        echo "Trash is empty." >&2
+        exit 0
+    fi
+
+    if ! $FORCE; then
+        echo "Permanently delete $count messages from trash? [y/N] "
+        read -r confirm
+        [[ "$confirm" != "y" && "$confirm" != "Y" ]] && exit 0
+    fi
+
+    rm -f "$TRASH_CUR"/*
+    echo "Deleted $count messages." >&2
+    exit 0
+fi
+
+# --age DAYS: remove trash older than DAYS
+if [[ -n "$AGE" ]]; then
+    count=$(find "$TRASH_CUR" -type f -mtime "+${AGE}" 2>/dev/null | wc -l)
+    if [[ $count -eq 0 ]]; then
+        echo "No trash older than $AGE days." >&2
+        exit 0
+    fi
+
+    if ! $FORCE; then
+        echo "Permanently delete $count messages older than $AGE days? [y/N] "
+        read -r confirm
+        [[ "$confirm" != "y" && "$confirm" != "Y" ]] && exit 0
+    fi
+
+    find "$TRASH_CUR" -type f -mtime "+${AGE}" -delete 2>/dev/null
+    echo "Deleted $count messages." >&2
+    exit 0
+fi
+
+# Move messages to trash
+if [[ ${#IDS[@]} -eq 1 && "${IDS[0]}" == "-" ]]; then
+    IDS=()
+    while IFS= read -r id; do
+        [[ -n "$id" ]] && IDS+=("$id")
+    done
+fi
+
+if [[ ${#IDS[@]} -eq 0 ]]; then
+    echo "mail-trash: no IDs provided" >&2
+    usage
+fi
+
+NOT_FOUND=0
+
+for id in "${IDS[@]}"; do
+    if [[ -f "$id" ]]; then
+        FILE="$id"
+    else
+        FILE=$(resolve_id "$id")
+        if [[ -z "$FILE" ]]; then
+            echo "mail-trash: not found: $id" >&2
+            ((NOT_FOUND++))
+            continue
+        fi
+    fi
+
+    maildir_transfer "$FILE" "$NM_MAILDIR/trash"
+    log_event "mail:trash" "$FILE"
+done
+
+if [[ $NOT_FOUND -gt 0 ]]; then
+    exit 1
+fi
+exit 0

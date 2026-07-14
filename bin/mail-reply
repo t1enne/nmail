@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# mail-reply — create a reply draft from an existing message
+#
+# Usage: mail-reply [options] <id|path>
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-reply [options] <id|path>
+
+Create a reply draft from an existing message.
+
+Options:
+  --all            Reply to all recipients
+  --template NAME  Use specific template
+  --no-quote       Don't quote original message
+  -h, --help       Show this help
+EOF
+    exit 0
+}
+
+REPLY_ALL=false
+TEMPLATE="reply"
+NO_QUOTE=false
+ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --all)        REPLY_ALL=true; shift ;;
+        --template)   TEMPLATE="$2"; shift 2 ;;
+        --template=*) TEMPLATE="${1#*=}"; shift ;;
+        --no-quote)   NO_QUOTE=true; shift ;;
+        -h|--help)    usage ;;
+        *)            ID="$1"; shift ;;
+    esac
+done
+
+if [[ -z "$ID" ]]; then
+    echo "mail-reply: missing message ID or path" >&2
+    usage
+fi
+
+# Resolve
+if [[ -f "$ID" ]]; then
+    FILE="$ID"
+else
+    FILE=$(resolve_id "$ID")
+    if [[ -z "$FILE" ]]; then
+        echo "mail-reply: message not found: $ID" >&2
+        exit 1
+    fi
+fi
+
+# Extract headers
+FROM=$(extract_header "$FILE" "From")
+TO=$(extract_header "$FILE" "To")
+CC=$(extract_header "$FILE" "Cc")
+SUBJECT=$(extract_header "$FILE" "Subject")
+MSGID=$(extract_header "$FILE" "Message-ID")
+DATE=$(extract_header "$FILE" "Date")
+REFS=$(extract_header "$FILE" "References")
+IN_REPLY=$(extract_header "$FILE" "In-Reply-To")
+
+# Build References header
+if [[ -n "$IN_REPLY" ]]; then
+    NEW_REFS="$REFS $IN_REPLY"
+elif [[ -n "$MSGID" ]]; then
+    NEW_REFS="$REFS $MSGID"
+else
+    NEW_REFS="$REFS"
+fi
+NEW_REFS=$(echo "$NEW_REFS" | xargs)  # trim
+
+# Determine reply To:
+if $REPLY_ALL; then
+    REPLY_TO="$FROM"
+    [[ -n "$CC" ]] && REPLY_TO="$REPLY_TO, $CC"
+else
+    REPLY_TO="$FROM"
+fi
+
+# Get my address
+MY_ADDR="${MAIL_FROM:-$(config_get general.from_address)}"
+[[ -z "$MY_ADDR" ]] && MY_ADDR="${USER}@$(hostname)"
+
+# Subject prefix
+SUBJECT="Re: ${SUBJECT#Re: }"
+SUBJECT="${SUBJECT#RE: }"
+
+# Create draft
+DRAFT="$NM_MAILDIR/drafts/reply-$(date +%Y%m%d-%H%M%S).md"
+ensure_maildir
+
+{
+    echo "From: $MY_ADDR"
+    echo "To: $REPLY_TO"
+    echo "Cc: "
+    echo "Subject: $SUBJECT"
+    echo "In-Reply-To: $MSGID"
+    echo "References: $NEW_REFS"
+    echo ""
+    echo "---"
+    echo ""
+
+    if ! $NO_QUOTE; then
+        echo "On $DATE, $FROM wrote:"
+        echo ""
+        extract_body "$FILE" | while IFS= read -r line; do
+            echo "> $line"
+        done
+    fi
+
+    # Signature
+    local sig
+    sig=$(config_get general.signature)
+    [[ -n "$sig" ]] && echo "" && echo "$sig"
+} > "$DRAFT"
+
+# Open editor
+open_editor "$DRAFT"
+
+# Validate and queue
+if validate_draft "$DRAFT"; then
+    queue_draft "$DRAFT"
+    echo "Reply queued." >&2
+    exit 0
+else
+    echo "Draft saved to: $DRAFT (fix errors and re-run)" >&2
+    exit 1
+fi

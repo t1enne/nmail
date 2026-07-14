@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# mail-watch — watch Maildir for changes and fire events
+#
+# Usage: mail-watch [--once] [--no-hooks]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-watch [options]
+
+Watch Maildir for changes and fire events.
+
+Options:
+  --once        Run once and exit (check for new mail)
+  --daemon      Run continuously (default)
+  --no-hooks    Don't fire hook scripts
+  -h, --help    Show this help
+EOF
+    exit 0
+}
+
+ONCE=false
+NO_HOOKS=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --once)     ONCE=true; shift ;;
+        --daemon)   ONCE=false; shift ;;
+        --no-hooks) NO_HOOKS=true; shift ;;
+        -h|--help)  usage ;;
+        *) shift ;;
+    esac
+done
+
+ensure_maildir
+
+INCOMING_NEW="$NM_MAILDIR/incoming/new"
+QUEUE_NEW="$NM_MAILDIR/queue/new"
+
+if $ONCE; then
+    # Check for new mail and exit
+    count=$(find "$INCOMING_NEW" -type f 2>/dev/null | wc -l)
+    queue_count=$(find "$QUEUE_NEW" -type f 2>/dev/null | wc -l)
+
+    if [[ $count -gt 0 ]]; then
+        log_event "mail:new" "$count"
+    fi
+
+    if [[ $queue_count -gt 0 ]]; then
+        log_event "mail:queue" "$queue_count"
+    fi
+
+    echo "New: $count, Queued: $queue_count"
+    exit 0
+fi
+
+# Continuous watching with inotifywait
+if ! command -v inotifywait &>/dev/null; then
+    echo "mail-watch: inotifywait not found (install inotify-tools)" >&2
+    echo "Falling back to polling every 60s..." >&2
+
+    while true; do
+        count=$(find "$INCOMING_NEW" -type f 2>/dev/null | wc -l)
+        if [[ $count -gt 0 ]]; then
+            log_event "mail:new" "$count"
+        fi
+        sleep 60
+    done
+fi
+
+# inotify-based watching
+echo "mail-watch: watching $INCOMING_NEW and $QUEUE_NEW" >&2
+
+# Track seen files to avoid duplicate events
+declare -A SEEN
+
+inotifywait -m -r -q \
+    -e create -e moved_to \
+    --format '%w%f' \
+    "$INCOMING_NEW" "$QUEUE_NEW" 2>/dev/null |
+while read -r file; do
+    # Debounce: wait briefly for file to be fully written
+    sleep 0.5
+
+    if [[ -f "$file" ]]; then
+        if [[ -z "${SEEN[$file]:-}" ]]; then
+            SEEN[$file]=1
+
+            if [[ "$file" == "$INCOMING_NEW/"* ]]; then
+                log_event "mail:new" "1"
+            elif [[ "$file" == "$QUEUE_NEW/"* ]]; then
+                log_event "mail:queue" "1"
+            fi
+        fi
+    fi
+done

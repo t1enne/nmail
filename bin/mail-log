@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# mail-log — query the activity log
+#
+# Usage: mail-log [--follow] [--since TIME] [--level N] [--event TYPE]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-log [options]
+
+Query the structured activity log.
+
+Options:
+  --follow     Tail the log
+  --since TIME Filter since TIME (ISO 8601 or relative: 1h, 2d)
+  --level N    Minimum log level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+  --event TYPE Filter by event type
+  --json       Output JSON lines only
+  -h, --help   Show this help
+EOF
+    exit 0
+}
+
+FOLLOW=false
+SINCE=""
+LEVEL=""
+EVENT=""
+JSON_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --follow)  FOLLOW=true; shift ;;
+        --since)   SINCE="$2"; shift 2 ;;
+        --since=*) SINCE="${1#*=}"; shift ;;
+        --level)   LEVEL="$2"; shift 2 ;;
+        --level=*) LEVEL="${1#*=}"; shift ;;
+        --event)   EVENT="$2"; shift 2 ;;
+        --event=*) EVENT="${1#*=}"; shift ;;
+        --json)    JSON_ONLY=true; shift ;;
+        -h|--help) usage ;;
+        *) shift ;;
+    esac
+done
+
+if [[ ! -f "$NM_LOG" ]]; then
+    echo "mail-log: no log file at $NM_LOG" >&2
+    exit 0
+fi
+
+# Follow mode
+if $FOLLOW; then
+    exec tail -f "$NM_LOG"
+fi
+
+# Filter and display
+filter_log() {
+    local jq_filter="."
+
+    # Since filter
+    if [[ -n "$SINCE" ]]; then
+        # Convert relative time to ISO timestamp
+        local since_ts
+        if [[ "$SINCE" =~ ^[0-9]+[smhd]$ ]]; then
+            since_ts=$(date -d "-${SINCE}" -Iseconds 2>/dev/null || echo "")
+        else
+            since_ts="$SINCE"
+        fi
+        [[ -n "$since_ts" ]] && jq_filter="$jq_filter | select(.ts >= \"$since_ts\")"
+    fi
+
+    # Event filter
+    [[ -n "$EVENT" ]] && jq_filter="$jq_filter | select(.event == \"$EVENT\")"
+
+    # Level filter (based on event type)
+    # error = level 3, warn = level 2, info = level 1, debug = level 0
+    if [[ -n "$LEVEL" ]]; then
+        case "$LEVEL" in
+            3) jq_filter="$jq_filter | select(.event == \"error\" or .event == \"mail:error\")" ;;
+            2) jq_filter="$jq_filter | select(.event == \"error\" or .event == \"warn\" or .event == \"mail:error\")" ;;
+        esac
+    fi
+
+    if $JSON_ONLY; then
+        jq -c "$jq_filter" "$NM_LOG" 2>/dev/null || cat "$NM_LOG"
+    else
+        jq -r "$jq_filter | \"[\(.ts)] \(.event) \(.args // \"\")\"" "$NM_LOG" 2>/dev/null || cat "$NM_LOG"
+    fi
+}
+
+filter_log

@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# mail-send — drain the outbound queue through SMTP
+#
+# Usage: mail-send [--dry-run] [--id <id>] [--retry N] [--all]
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+source "${NM_LIBDIR}/render.sh"
+
+# ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+
+usage() {
+    cat <<'EOF'
+Usage: mail-send [options] [draft-file...]
+
+Send queued messages via SMTP (msmtp).
+
+Options:
+  --dry-run       Render but don't send
+  --id ID         Send specific queue ID
+  --account NAME  Use specific SMTP account
+  --retry N       Retry failed sends up to N times (default: 0)
+  --all           Include queue/cur/ (previously failed)
+  -h, --help      Show this help
+EOF
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Parse args
+# ---------------------------------------------------------------------------
+
+DRY_RUN=false
+SPECIFIC_ID=""
+RETRIES=0
+SEND_ALL=false
+ACCOUNT=""
+FILES=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)      DRY_RUN=true; shift ;;
+        --id)           SPECIFIC_ID="$2"; shift 2 ;;
+        --id=*)         SPECIFIC_ID="${1#*=}"; shift ;;
+        --retry)        RETRIES="$2"; shift 2 ;;
+        --retry=*)      RETRIES="${1#*=}"; shift ;;
+        --all)          SEND_ALL=true; shift ;;
+        --account)      ACCOUNT="$2"; shift 2 ;;
+        --account=*)    ACCOUNT="${1#*=}"; shift ;;
+        -h|--help)      usage ;;
+        *)              FILES+=("$1"); shift ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Find messages to send
+# ---------------------------------------------------------------------------
+
+QUEUE_NEW="$NM_MAILDIR/queue/new"
+QUEUE_TMP="$NM_MAILDIR/queue/tmp"
+QUEUE_CUR="$NM_MAILDIR/queue/cur"
+SENT_DIR="$NM_MAILDIR/sent"
+
+mkdir -p "$QUEUE_NEW" "$QUEUE_TMP" "$QUEUE_CUR" "$SENT_DIR/new" "$SENT_DIR/cur" "$SENT_DIR/tmp"
+
+# Collect files to process
+TO_SEND=()
+
+if [[ -n "$SPECIFIC_ID" ]]; then
+    # Find by ID
+    local f
+    f=$(find "$QUEUE_NEW" "$QUEUE_CUR" -name "*${SPECIFIC_ID}*" -type f 2>/dev/null | head -1)
+    if [[ -z "$f" ]]; then
+        echo "mail-send: no queued message with ID: $SPECIFIC_ID" >&2
+        exit 2
+    fi
+    TO_SEND+=("$f")
+elif [[ ${#FILES[@]} -gt 0 ]]; then
+    TO_SEND=("${FILES[@]}")
+else
+    # Drain queue/new/
+    while IFS= read -r -d '' f; do
+        TO_SEND+=("$f")
+    done < <(find "$QUEUE_NEW" -type f -print0 2>/dev/null || true)
+
+    if $SEND_ALL; then
+        while IFS= read -r -d '' f; do
+            TO_SEND+=("$f")
+        done < <(find "$QUEUE_CUR" -type f -print0 2>/dev/null || true)
+    fi
+fi
+
+if [[ ${#TO_SEND[@]} -eq 0 ]]; then
+    echo "mail-send: queue empty" >&2
+    exit 2
+fi
+
+# ---------------------------------------------------------------------------
+# Check msmtp
+# ---------------------------------------------------------------------------
+
+SMTP_CMD="${MAIL_SMTP_CMD:-$(config_get smtp.command)}"
+SMTP_CMD="${SMTP_CMD:-msmtp}"
+
+if ! command -v "$SMTP_CMD" &>/dev/null; then
+    echo "mail-send: SMTP command not found: $SMTP_CMD" >&2
+    exit 3
+fi
+
+# ---------------------------------------------------------------------------
+# Send each message
+# ---------------------------------------------------------------------------
+
+SUCCESS=0
+FAILED=0
+
+for src in "${TO_SEND[@]}"; do
+    filename=$(basename "$src")
+    tmp="$QUEUE_TMP/$filename"
+    sent="$SENT_DIR/cur/$filename"
+
+    # Move to tmp/
+    mv "$src" "$tmp"
+
+    if $DRY_RUN; then
+        echo "[DRY-RUN] Would render and send: $filename"
+        echo "[DRY-RUN]   Render preview:"
+        render_message "$tmp" "mime" | head -20
+        echo "[DRY-RUN]   ..."
+        mv "$tmp" "$src"  # put back
+        continue
+    fi
+
+    # Render
+    rendered=$(render_message "$tmp" "mime" 2>/dev/null)
+    render_exit=$?
+
+    if [[ $render_exit -ne 0 ]]; then
+        echo "mail-send: render failed for $filename" >&2
+        mv "$tmp" "$QUEUE_CUR/$filename"
+        log_event "mail:error" "$filename" "render failed"
+        ((FAILED++))
+        continue
+    fi
+
+    # Send via msmtp
+    msmtp_args=("-t")
+    [[ -n "$ACCOUNT" ]] && msmtp_args+=("-a" "$ACCOUNT")
+
+    attempt=0
+    sent_ok=false
+
+    while [[ $attempt -le $RETRIES ]]; do
+        if echo "$rendered" | "$SMTP_CMD" "${msmtp_args[@]}" 2>/tmp/nmail-msmtp-error.$$; then
+            sent_ok=true
+            break
+        else
+            attempt=$((attempt + 1))
+            if [[ $attempt -le $RETRIES ]]; then
+                echo "mail-send: retry $attempt/$RETRIES for $filename" >&2
+                sleep "$(config_get queue.retry_delay)"
+                RETRY_DELAY="${RETRY_DELAY:-5}"
+                sleep "${RETRY_DELAY:-5}"
+            fi
+        fi
+    done
+
+    if $sent_ok; then
+        # Success: move to sent/
+        echo "$rendered" > "$sent"
+        rm "$tmp"
+        log_event "mail:sent" "$filename"
+        echo "  ✓ $filename" >&2
+        ((SUCCESS++))
+    else
+        # Failure: move to queue/cur/ with error note
+        local err
+        err=$(cat /tmp/nmail-msmtp-error.$$ 2>/dev/null || echo "unknown error")
+        rm -f /tmp/nmail-msmtp-error.$$
+
+        # Append error to file
+        {
+            cat "$tmp"
+            echo ""
+            echo "X-nmail-Error: $err"
+            echo "X-nmail-Attempts: $((attempt))"
+        } > "$QUEUE_CUR/$filename"
+        rm "$tmp"
+
+        log_event "mail:error" "$filename" "$err"
+        echo "  ✗ $filename: $err" >&2
+        ((FAILED++))
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+
+echo "Sent: $SUCCESS, Failed: $FAILED" >&2
+
+if [[ $FAILED -gt 0 ]]; then
+    exit 1
+fi
+exit 0

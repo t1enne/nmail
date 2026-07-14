@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# mail-tag — add or remove notmuch tags
+#
+# Usage: mail-tag <+tag|-tag> <id...>
+#        ... | mail-tag <+tag|-tag> -
+
+set -euo pipefail
+
+NM_LIBDIR="${NM_LIBDIR:-$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../src}"
+source "${NM_LIBDIR}/common.sh"
+source "${NM_LIBDIR}/notmuch.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: mail-tag <+tag|-tag> <id...>
+       ... | mail-tag <+tag|-tag> -
+
+Add or remove notmuch tags.
+
+Examples:
+  mail-tag +todo 182
+  mail-tag -unread 182 193
+  mail-search from:alice | mail-tag +alice -
+EOF
+    exit 0
+}
+
+if [[ $# -lt 1 ]]; then
+    usage
+fi
+
+# Handle --help before operation parsing
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    usage
+fi
+
+OP_TAG="$1"
+shift
+
+if [[ "$OP_TAG" != [+-]* ]]; then
+    echo "mail-tag: operation must start with + or - (got: $OP_TAG)" >&2
+    exit 1
+fi
+
+IDS=()
+
+if [[ $# -eq 1 && "$1" == "-" ]]; then
+    # Read IDs from stdin
+    while IFS= read -r id; do
+        [[ -n "$id" ]] && IDS+=("$id")
+    done
+else
+    IDS=("$@")
+fi
+
+if [[ ${#IDS[@]} -eq 0 ]]; then
+    echo "mail-tag: no IDs provided" >&2
+    exit 1
+fi
+
+for id in "${IDS[@]}"; do
+    # Resolve path if needed
+    if [[ -f "$id" ]]; then
+        notmuch_tag "$OP_TAG" "$(basename "$id" | sed 's/:2,.*//')"
+    else
+        notmuch_tag "$OP_TAG" "$id"
+    fi
+done
+
+log_event "mail:tag" "$OP_TAG" "${#IDS[@]}"

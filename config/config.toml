@@ -1,0 +1,54 @@
+# nmail configuration
+# https://github.com/user/nmail
+
+[general]
+maildir = "~/Mail"
+editor = "nvim"
+pager = "bat --plain --language=email"
+file_browser = "lf"
+markdown_converter = "pandoc -f markdown -t html"
+from_address = ""
+signature = ""
+
+[smtp]
+# SMTP send command (msmtp by default)
+command = "msmtp"
+
+[queue]
+# seconds between queue drain attempts (0 = manual only)
+process_interval = 60
+max_retries = 3
+retry_delay = 300
+
+[sync]
+# mbsync, offlineimap, or custom
+tool = "mbsync"
+accounts = []
+interval = 300
+
+[notmuch]
+enabled = true
+command = "notmuch"
+
+[hooks]
+dir = "~/.config/nmail/hooks.d/"
+enabled = true
+
+[tmux]
+session = "mail"
+layout = "grid"
+command = "tmux"
+
+[logging]
+dir = "~/Mail/logs"
+level = "info"
+max_size = 10
+keep = 5
+
+[notifications]
+enabled = true
+events = ["mail:new", "mail:error"]
+
+[templates]
+dir = "~/Mail/templates"
+default = "default"

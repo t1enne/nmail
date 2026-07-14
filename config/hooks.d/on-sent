@@ -1,0 +1,4 @@
+#!/bin/bash
+# $1 = "mail:sent", $2 = queue-id
+id="${2:-unknown}"
+echo "[$(date -Iseconds)] sent: $id" >> ~/.mail-activity.log
