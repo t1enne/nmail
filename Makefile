@@ -3,15 +3,18 @@
 SRC := src/nmail
 
 format:
-	uv tool run ruff format $(SRC)
+	uv run ruff format $(SRC)
 
 lint:
-	uv tool run ruff check $(SRC)
+	uv run ruff check $(SRC)
 
 typecheck:
-	uv tool run ty check $(SRC)
+	uv run ty check $(SRC)
 
-check: format lint typecheck
+test:
+	uv run pytest tests/ -v
+
+check: format lint typecheck test
 
 install:
 	uv tool install --reinstall .
