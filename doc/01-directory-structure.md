@@ -13,27 +13,6 @@
     ├── personal.toml
     └── work.toml
 
-~/.local/bin/                # All commands (in PATH)
-├── mail-session             # tmux bootstrap
-├── mail-compose             # Open draft in $EDITOR
-├── mail-render              # Markdown → MIME
-├── mail-send                # Drain queue → SMTP
-├── mail-sync                # Fetch via mbsync/offlineimap
-├── mail-watch               # inotifywait on Maildir
-├── mail-open                # Open message by ID
-├── mail-reply               # Reply to message
-├── mail-forward             # Forward message
-├── mail-search              # notmuch/fzf/grep search
-├── mail-tag                 # Add/remove notmuch tags
-├── mail-archive             # Move to archive/
-├── mail-trash               # Move to trash/
-├── mail-contacts            # Extract/query contacts
-├── mail-template            # Manage draft templates
-├── mail-status              # Counts, queue state
-├── mail-log                 # Query structured log
-├── mail-attach              # Manage attachment dir
-└── mail-hook                # Run hooks.d/ scripts
-
 ~/Mail/                      # Maildir root
 ├── incoming/                # Incoming (Maildir)
 │   ├── cur/                 # Read messages
@@ -78,31 +57,20 @@
 
 ```
 nmail/
-├── bin/                      # Executable scripts (linked to ~/.local/bin/)
-│   ├── mail-session
-│   ├── mail-compose
-│   ├── mail-render
-│   ├── mail-send
-│   ├── mail-sync
-│   ├── mail-watch
-│   ├── mail-open
-│   ├── mail-reply
-│   ├── mail-forward
-│   ├── mail-search
-│   ├── mail-tag
-│   ├── mail-archive
-│   ├── mail-trash
-│   ├── mail-contacts
-│   ├── mail-template
-│   ├── mail-status
-│   ├── mail-log
-│   ├── mail-attach
-│   └── mail-hook
-├── src/                      # Shared libraries (bash)
-│   ├── common.sh             # Logging, Maildir helpers, config parsing
-│   ├── render.sh             # Markdown → MIME pipeline
-│   ├── maildir.sh            # Maildir operations
-│   └── notmuch.sh            # notmuch wrapper (graceful fallback)
+├── src/nmail/                # Python package
+│   ├── __init__.py
+│   ├── cli.py                # Click entrypoint (all subcommands)
+│   ├── cli_commands1.py
+│   ├── cli_commands2.py
+│   ├── config.py             # TOML config loader
+│   ├── constants.py
+│   ├── drafts.py             # Draft parsing (MD + headers)
+│   ├── headers.py            # Header extraction
+│   ├── logging.py            # Structured log
+│   ├── maildir.py            # Maildir operations
+│   ├── notmuch.py            # notmuch wrapper
+│   ├── render.py             # Markdown → RFC5322 MIME
+│   └── shared.py             # Shared helpers
 ├── config/
 │   ├── config.toml           # Default configuration
 │   └── hooks.d/              # Example hooks
@@ -123,8 +91,9 @@ nmail/
 │   ├── 06-composability.md
 │   ├── 07-hooks.md
 │   ├── 08-implementation-plan.md
-│   └── 09-example-pipelines.md
-├── install.sh                # Symlink bin/ → ~/.local/bin/, init ~/Mail/
-├── Makefile                  # install, uninstall, test
+│   ├── 09-example-pipelines.md
+│   └── 10-installation-and-e2e-guide.md
+├── pyproject.toml            # Python project config + deps
+├── Makefile                  # format, lint, typecheck
 └── README.md
 ```

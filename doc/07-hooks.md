@@ -26,10 +26,10 @@ Two extension mechanisms:
 ### Hook Execution
 
 ```
-mail-sync completes
+nmail sync completes
     │
     ▼
-mail-hook mail:sync-end 3
+nmail hook mail:sync-end 3
     │
     ▼
 for each executable in ~/.config/nmail/hooks.d/ matching "sync-end":
@@ -62,7 +62,6 @@ Each file must be executable. Naming convention: `on-<event-short-name>`. Only t
 **on-new (notification):**
 ```bash
 #!/bin/bash
-# $1 = "mail:new", $2 = count
 count="${2:-0}"
 if (( count > 0 )); then
     notify-send "📬 New Mail" "$count new message(s)" \
@@ -74,7 +73,6 @@ fi
 **on-new (index):**
 ```bash
 #!/bin/bash
-# Re-index notmuch after new mail
 if command -v notmuch &>/dev/null; then
     notmuch new 2>/dev/null
 fi
@@ -83,26 +81,21 @@ fi
 **on-sent (log):**
 ```bash
 #!/bin/bash
-# $1 = "mail:sent", $2 = queue-id
 echo "[$(date -Iseconds)] sent $2" >> ~/.mail-activity.log
 ```
 
 **on-error (alert + retry):**
 ```bash
 #!/bin/bash
-# $1 = "mail:error", $2 = queue-id, $3 = error
 id="$2"
 err="$3"
 notify-send -u critical "❌ Mail Send Failed" "$id: $err"
-
-# Queue for retry in 5 minutes
 echo "$id" >> /tmp/nmail-retry-queue
 ```
 
 **on-sync-end (summary):**
 ```bash
 #!/bin/bash
-# $1 = "mail:sync-end", $2 = count
 count="${2:-0}"
 echo "[$(date -Iseconds)] sync: $count new" >> ~/Mail/logs/sync.log
 ```
@@ -138,9 +131,6 @@ license = "MIT"
 # Dependencies: commands that must exist
 [requirements]
 commands = ["notify-send", "jq"]
-# Optional: minimum versions
-# [requirements.versions]
-# jq = "1.6"
 
 # Hooks this plugin provides
 [hooks]
@@ -160,25 +150,25 @@ conflicts = ["other-notification-plugin"]
 
 ```bash
 # Install from directory
-mail-plugin install ./my-plugin/
+nmail plugin install ./my-plugin/
 
 # Install from git
-mail-plugin install https://github.com/user/nmail-plugin-notify
+nmail plugin install https://github.com/user/nmail-plugin-notify
 
 # List installed plugins
-mail-plugin list
+nmail plugin list
 
 # Enable/disable
-mail-plugin enable my-plugin
-mail-plugin disable my-plugin
+nmail plugin enable my-plugin
+nmail plugin disable my-plugin
 
 # Remove
-mail-plugin remove my-plugin
+nmail plugin remove my-plugin
 ```
 
 ### Plugin Loading
 
-On startup, `mail-session` (and any command that fires hooks):
+On startup, `nmail session` (and any command that fires hooks):
 
 1. Read `~/.config/nmail/config.toml` → `plugins.enabled`
 2. For each enabled plugin:
@@ -192,14 +182,14 @@ On startup, `mail-session` (and any command that fires hooks):
 Plugins can be listed via:
 
 ```bash
-mail-plugin search            # Search known plugin index
-mail-plugin search notify     # Search with query
+nmail plugin search            # Search known plugin index
+nmail plugin search notify     # Search with query
 ```
 
-## `mail-plugin` Command
+## `nmail plugin` Command
 
 ```
-mail-plugin <operation> [args]
+nmail plugin <operation> [args]
 
 Manage nmail plugins.
 
@@ -214,10 +204,10 @@ Operations:
   search QUERY        Search remote plugin index
 
 Examples:
-  mail-plugin install ~/dev/nmail-plugin-gpg
-  mail-plugin install https://github.com/user/nmail-plugin-notify
-  mail-plugin list
-  mail-plugin enable my-plugin
+  nmail plugin install ~/dev/nmail-plugin-gpg
+  nmail plugin install https://github.com/user/nmail-plugin-notify
+  nmail plugin list
+  nmail plugin enable my-plugin
 ```
 
 ## Standard Plugin Ideas
@@ -241,12 +231,12 @@ Examples:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      EVENT SOURCE                            │
-│  mail-sync, mail-send, mail-compose, mail-tag, etc.         │
+│  nmail sync, nmail send, nmail compose, nmail tag, etc.     │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    mail-hook <event> <args>                   │
+│                    nmail hook <event> <args>                  │
 │                                                              │
 │  1. Log event to ~/Mail/logs/mail.log                        │
 │  2. Find matching hooks in ~/.config/nmail/hooks.d/         │
@@ -271,11 +261,11 @@ Examples:
 
 ## Pre/Post Hook Distinction
 
-For operations that support it (e.g., `mail-send`), hooks can be pre or post:
+For operations that support it (e.g., `nmail send`), hooks can be pre or post:
 
 ```
 ~/.config/nmail/hooks.d/
-├── pre-send-gpg        # Runs BEFORE mail-render
+├── pre-send-gpg        # Runs BEFORE nmail render
 ├── on-sent-log         # Runs AFTER successful send
 └── on-error-retry      # Runs AFTER failed send
 ```
@@ -287,9 +277,5 @@ Pre hooks receive the draft file path as `$3`. They can modify it in-place. Exit
 ```bash
 #!/bin/bash
 # pre-send-gpg — sign the draft before sending
-# $1 = mail:pre-send
-# $2 = queue-id
-# $3 = draft file path (in queue/tmp/)
-
 gpg --sign --armor "$3"
 ```

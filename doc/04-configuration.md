@@ -26,12 +26,6 @@ pager = "bat --plain --language=email"
 # File browser for inbox/directories. Default: lf
 file_browser = "lf"
 
-# Markdown → HTML converter. Default: pandoc
-markdown_converter = "pandoc -f markdown -t html"
-
-# HTML → text converter (for text/plain fallback). Default: pandoc
-html_to_text = "pandoc -f html -t plain"
-
 # Default signature appended to drafts
 signature = """
 --
@@ -52,13 +46,11 @@ default_template = "default"
 [smtp]
 # SMTP send command. Uses msmtp by default.
 # The rendered message is piped to this command's stdin.
-# Command receives -t flag (read recipients from headers).
 command = "msmtp"
 
 # Queue processing
 [queue]
 # How often to drain the queue (seconds). 0 = manual only.
-# Used by systemd timer or mail-watch.
 process_interval = 60
 
 # Max retries for failed sends
@@ -92,7 +84,7 @@ enabled = true
 # notmuch binary path
 command = "notmuch"
 
-# Additional notmuch new arguments
+# Extra arguments for notmuch new
 new_args = ""
 
 # ---------------------------------------------------------------------------
@@ -165,7 +157,6 @@ default = "default"
 
 # SMTP account configuration (used by msmtp)
 # nmail itself doesn't read these — they're passed to msmtp/mbsync.
-# Documented here for completeness.
 
 # [[account]]
 # name = "personal"
@@ -277,8 +268,6 @@ Each hook receives:
 
 ```bash
 #!/bin/bash
-# $1 = event name
-# $2 = count of new messages
 count="$2"
 notify-send "Mail" "$count new message(s)" --icon=mail-unread
 ```
@@ -287,8 +276,6 @@ notify-send "Mail" "$count new message(s)" --icon=mail-unread
 
 ```bash
 #!/bin/bash
-# $1 = event name
-# $2 = queue ID
 id="$2"
 echo "Sent: $id" >> ~/.mail-sent.log
 ```
@@ -297,9 +284,6 @@ echo "Sent: $id" >> ~/.mail-sent.log
 
 ```bash
 #!/bin/bash
-# $1 = event name
-# $2 = queue ID
-# $3 = error message
 id="$2"
 error="$3"
 notify-send -u critical "Mail Error" "Failed to send $id: $error"

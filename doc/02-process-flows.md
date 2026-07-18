@@ -6,7 +6,7 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │ STEP 1: COMPOSE                                                  │
 │                                                                  │
-│   mail-compose [draft.md]                                        │
+│   nmail compose [draft.md]                                       │
 │       │                                                          │
 │       ├─ No arg: open $EDITOR on ~/Mail/drafts/<timestamp>.md    │
 │       ├─ Arg:    open $EDITOR on specified file                  │
@@ -35,7 +35,7 @@
 │   User saves and closes $EDITOR                                  │
 │       │                                                          │
 │       ▼                                                          │
-│   mail-compose validates:                                        │
+│   nmail compose validates:                                       │
 │       ├─ To: header present?                                     │
 │       ├─ Subject: present?                                       │
 │       └─ Body non-empty?                                         │
@@ -82,9 +82,9 @@
                                 │
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ STEP 3: SEND (triggered by cron/systemd-timer/mail-watch)        │
+│ STEP 3: SEND (triggered by cron/systemd-timer/nmail watch)       │
 │                                                                  │
-│   mail-send [--dry-run] [--id <queue-id>]                        │
+│   nmail send [--dry-run] [--id <queue-id>]                       │
 │       │                                                          │
 │       ├─ Acquire queue lock (~/.local/state/nmail/queue-lock)    │
 │       │                                                          │
@@ -92,16 +92,15 @@
 │       │                                                          │
 │       │   1. Move queue/new/<id> → queue/tmp/<id>                │
 │       │                                                          │
-│       │   2. mail-render queue/tmp/<id> → pipe to msmtp          │
+│       │   2. nmail render queue/tmp/<id> → pipe to msmtp         │
 │       │      │                                                   │
-│       │      │  mail-render pipeline:                            │
+│       │      │  nmail render pipeline:                           │
 │       │      │  ┌─────────────────────────────────┐             │
 │       │      │  │ Parse headers                   │             │
 │       │      │  │ Extract body (markdown)          │             │
-│       │      │  │ Convert markdown → HTML (pandoc) │             │
 │       │      │  │ Build multipart/alternative MIME │             │
 │       │      │  │   text/plain  ← markdown as-is   │             │
-│       │      │  │   text/html   ← pandoc output    │             │
+│       │      │  │   text/html   ← markdown as-is   │             │
 │       │      │  │ Attach files from Attachments:   │             │
 │       │      │  │ Output RFC5322 to stdout         │             │
 │       │      │  └─────────────────────────────────┘             │
@@ -133,7 +132,7 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │ STEP 1: SYNC                                                     │
 │                                                                  │
-│   mail-sync [--account <name>] [--dry-run]                       │
+│   nmail sync [--account <name>] [--dry-run]                      │
 │       │                                                          │
 │       ├─ Read config: which sync tool, which accounts            │
 │       │                                                          │
@@ -171,11 +170,10 @@
 │   notmuch new                                                    │
 │       │                                                          │
 │       └─ Indexes incoming/, sent/, archive/                      │
-│          (configured via ~/.notmuch-config or notmuch CLI)       │
 │                                                                  │
 │   This can be triggered:                                         │
 │   ├─ By hooks.d/on-sync-end calling notmuch new                  │
-│   ├─ By mail-watch detecting new files in incoming/new/          │
+│   ├─ By nmail watch detecting new files in incoming/new/         │
 │   └─ Manually via notmuch new                                    │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
@@ -184,7 +182,7 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │ STEP 3: SEARCH                                                   │
 │                                                                  │
-│   mail-search [--format ids|paths|summary] <query>               │
+│   nmail search [--format ids|paths|summary] <query>              │
 │       │                                                          │
 │       ├─ With notmuch:                                           │
 │       │   notmuch search --output=files <query>                  │
@@ -193,14 +191,9 @@
 │       │   rg -l "<query>" ~/Mail/incoming/ ~/Mail/archive/       │
 │       │       ~/Mail/sent/                                       │
 │       │                                                          │
-│       ├─ With fzf (interactive):                                 │
-│       │   notmuch search --output=files <query> |                │
-│       │   xargs -I{} sh -c 'echo {} | mail-preview-header' |    │
-│       │   fzf --preview 'mail-preview {}'                        │
-│       │                                                          │
 │       └─ Output: file paths (one per line)                       │
 │                                                                  │
-│   mail-open <id-or-path>                                         │
+│   nmail open <id-or-path>                                        │
 │       │                                                          │
 │       ├─ Resolve ID to file path (via notmuch or glob)           │
 │       │                                                          │
@@ -211,11 +204,11 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## Flow 3: Event Loop (mail-watch)
+## Flow 3: Event Loop (nmail watch)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ mail-watch                                                       │
+│ nmail watch                                                      │
 │                                                                  │
 │   Watches Maildir with inotifywait:                              │
 │                                                                  │
@@ -227,17 +220,15 @@
 │       ├─ File appears in incoming/new/ →                          │
 │       │   Log "mail:new 1"                                       │
 │       │   Fire hooks.d/on-new 1                                  │
-│       │   (hooks.d/on-new might: notify-send,                   │
-│       │    refresh tmux status bar, run notmuch new)             │
 │       │                                                          │
 │       └─ File appears in queue/new/ →                            │
 │           Log "queue:new"                                        │
-│           (Could trigger mail-send if configured)                │
+│           (Could trigger nmail send if configured)               │
 │                                                                  │
 │   Designed to run in background:                                 │
 │   ├─ systemd --user service                                      │
-│   ├─ tmux pane: mail-watch                                       │
-│   └─ Manual: mail-watch &                                        │
+│   ├─ tmux pane: nmail watch                                      │
+│   └─ Manual: nmail watch &                                       │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -246,7 +237,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ mail-reply <id>                                                  │
+│ nmail reply <id>                                                 │
 │       │                                                          │
 │       ├─ Resolve <id> to message file in Maildir                 │
 │       │                                                          │
@@ -270,7 +261,7 @@
 │       │                                                          │
 │       └─ Open in $EDITOR                                       │
 │                                                                  │
-│ mail-forward <id>                                                │
+│ nmail forward <id>                                               │
 │       │                                                          │
 │       ├─ Similar to reply, but:                                  │
 │       │   - To: empty (user fills)                               │

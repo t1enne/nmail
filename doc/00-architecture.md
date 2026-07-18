@@ -5,17 +5,17 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          USER                                       │
-│  shell pipeline, keybind, or mail-session tmux bootstrap            │
+│  shell pipeline, keybind, or nmail session tmux bootstrap           │
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │
         ┌───────────────────────┼───────────────────────┐
         ▼                       ▼                       ▼
 ┌───────────────┐     ┌───────────────┐     ┌───────────────────┐
-│  mail-compose │     │  mail-search  │     │   mail-sync       │
-│  mail-reply   │     │  mail-tag     │     │   mail-watch      │
-│  mail-forward │     │  mail-open    │     │   mail-fetch      │
-│  mail-send    │     │  mail-archive │     └─────────┬─────────┘
-│  mail-render  │     │  mail-trash   │               │
+│  nmail compose│     │  nmail search │     │   nmail sync      │
+│  nmail reply  │     │  nmail tag    │     │   nmail watch     │
+│  nmail forward│     │  nmail open   │     └─────────┬─────────┘
+│  nmail send   │     │  nmail archive│               │
+│  nmail render │     │  nmail trash  │               │
 └───────┬───────┘     └───────┬───────┘               │
         │                     │                       │
         ▼                     ▼                       ▼
@@ -42,7 +42,7 @@
 ┌───────────────┐     ┌───────────────┐     ┌───────────────────┐
 │   INDEX       │     │   TRANSPORT   │     │    RENDER         │
 │               │     │               │     │                   │
-│  notmuch      │     │  mbsync       │     │  mail-render      │
+│  notmuch      │     │  mbsync       │     │  nmail render     │
 │  (optional)   │     │  msmtp        │     │  (markdown→MIME)  │
 │               │     │  offlineimap  │     │                   │
 └───────────────┘     └───────────────┘     └───────────────────┘
@@ -54,23 +54,23 @@
 
 2. **Maildir everywhere.** Incoming, sent, archive, trash, queue—all Maildir layout. `tmp/`, `new/`, `cur/` with `:2,` flags suffix. Standard tools (mbsync, notmuch, mu) work natively.
 
-3. **Drafts are Markdown.** Human-editable. Headers in YAML-style frontmatter or RFC822-style header block above `---`. Body is Markdown. `mail-render` produces RFC5322+MIME.
+3. **Drafts are Markdown.** Human-editable. Headers in RFC822-style header block above `---`. Body is Markdown. `nmail render` produces RFC5322+MIME.
 
-4. **Queue-based sending.** `mail-compose` writes to `queue/new/`. A background sender (cron, systemd timer, or `mail-watch`) drains the queue through `msmtp` into `sent/`. Non-blocking.
+4. **Queue-based sending.** `nmail compose` writes to `queue/new/`. A background sender (cron, systemd timer, or `nmail watch`) drains the queue through `msmtp` into `sent/`. Non-blocking.
 
-5. **Tmux is workspace, not application.** `mail-session` is a shell script that creates a tmux session with panes running NeoVim, lf/yazi, `tail -f` on logs. No custom TUI.
+5. **Tmux is workspace, not application.** `nmail session` creates a tmux session with panes running NeoVim, lf/yazi, `tail -f` on logs. No custom TUI.
 
 6. **Event-driven via filesystem.** `inotifywait` on Maildir directories triggers hooks. New mail → notification → refresh. Queue drained → log event.
 
 7. **Plain-text configuration.** Single TOML file. No DSL, no database.
 
-8. **Optional integrations.** notmuch for search, mbsync for IMAP, msmtp for SMTP, pandoc for rendering. Each is optional. Fall back to `grep`/`fd` for search when notmuch absent.
+8. **Optional integrations.** notmuch for search, mbsync for IMAP, msmtp for SMTP. Each is optional. Fall back to `grep`/`fd` for search when notmuch absent.
 
 ## Component Map
 
 ```
                     ┌──────────────────────────┐
-                    │      mail-session         │
+                    │      nmail session        │
                     │   (tmux bootstrap)        │
                     └──────────┬───────────────┘
                                │ orchestrates panes
@@ -84,11 +84,11 @@
                 ▼              ▼              ▼
         ┌──────────────────────────────────────────┐
         │           STANDALONE COMMANDS            │
-        │  mail-compose, mail-open, mail-search,   │
-        │  mail-render, mail-send, mail-sync,      │
-        │  mail-tag, mail-archive, mail-trash,     │
-        │  mail-reply, mail-forward, mail-status,  │
-        │  mail-contacts, mail-template, mail-log  │
+        │  nmail compose, nmail open, nmail search,│
+        │  nmail render, nmail send, nmail sync,   │
+        │  nmail tag, nmail archive, nmail trash,  │
+        │  nmail reply, nmail forward, nmail status│
+        │  nmail contacts, nmail template,nmail log│
         └──────────────────────────────────────────┘
                 │              │              │
                 ▼              ▼              ▼
@@ -101,92 +101,92 @@
 ## Data Flow: Compose → Queue → Send
 
 ```
-  User                 mail-compose               Queue                 mail-send              SMTP
-  ────                 ────────────               ─────                 ─────────              ────
-    │                       │                       │                       │                    │
-    │  edit draft.md        │                       │                       │                    │
-    │──────────────────────►│                       │                       │                    │
-    │                       │                       │                       │                    │
-    │                       │  write to              │                       │                    │
-    │                       │  queue/new/            │                       │                    │
-    │                       │──────────────────────►│                       │                    │
-    │                       │                       │                       │                    │
-    │                       │                       │  cron/systemd timer    │                    │
-    │                       │                       │  triggers mail-send    │                    │
-    │                       │                       │──────────────────────►│                    │
-    │                       │                       │                       │                    │
-    │                       │                       │                       │  mail-render       │
-    │                       │                       │                       │  markdown→MIME     │
-    │                       │                       │                       │────────┐           │
-    │                       │                       │                       │        │           │
-    │                       │                       │                       │◄───────┘           │
-    │                       │                       │                       │                    │
-    │                       │                       │                       │  msmtp send        │
-    │                       │                       │                       │───────────────────►│
-    │                       │                       │                       │                    │
-    │                       │                       │                       │  move to sent/     │
-    │                       │                       │                       │────────┐           │
-    │                       │                       │                       │        │           │
-    │                       │                       │                       │◄───────┘           │
-    │                       │                       │                       │                    │
-    │                       │                       │  log event            │                    │
-    │                       │                       │◄──────────────────────│                    │
-    │                       │                       │                       │                    │
+  User               nmail compose             Queue               nmail send             SMTP
+  ────               ────────────             ─────               ─────────             ────
+    │                       │                     │                     │                  │
+    │  edit draft.md        │                     │                     │                  │
+    │──────────────────────►│                     │                     │                  │
+    │                       │                     │                     │                  │
+    │                       │  write to            │                     │                  │
+    │                       │  queue/new/          │                     │                  │
+    │                       │────────────────────►│                     │                  │
+    │                       │                     │                     │                  │
+    │                       │                     │  cron/systemd timer  │                  │
+    │                       │                     │  triggers nmail send │                  │
+    │                       │                     │────────────────────►│                  │
+    │                       │                     │                     │                  │
+    │                       │                     │                     │  nmail render     │
+    │                       │                     │                     │  markdown→MIME    │
+    │                       │                     │                     │──────┐            │
+    │                       │                     │                     │      │            │
+    │                       │                     │                     │◄─────┘            │
+    │                       │                     │                     │                  │
+    │                       │                     │                     │  msmtp send       │
+    │                       │                     │                     │─────────────────►│
+    │                       │                     │                     │                  │
+    │                       │                     │                     │  move to sent/    │
+    │                       │                     │                     │──────┐            │
+    │                       │                     │                     │      │            │
+    │                       │                     │                     │◄─────┘            │
+    │                       │                     │                     │                  │
+    │                       │                     │  log event           │                  │
+    │                       │                     │◄────────────────────│                  │
+    │                       │                     │                     │                  │
 ```
 
 ## Data Flow: Sync → Index → Search
 
 ```
-  Remote (IMAP)         mail-sync              Maildir              notmuch              mail-search
-  ─────────────         ─────────              ───────              ───────              ───────────
-       │                     │                     │                     │                     │
-       │  fetch new mail     │                     │                     │                     │
-       │◄───────────────────►│                     │                     │                     │
-       │  via mbsync         │                     │                     │                     │
-       │                     │                     │                     │                     │
-       │                     │  write to           │                     │                     │
-       │                     │  incoming/new/      │                     │                     │
-       │                     │────────────────────►│                     │                     │
-       │                     │                     │                     │                     │
-       │                     │  fire hook:         │                     │                     │
-       │                     │  mail:new           │                     │                     │
-       │                     │────────┐            │                     │                     │
-       │                     │        │            │                     │                     │
-       │                     │◄───────┘            │                     │                     │
-       │                     │                     │                     │                     │
-       │                     │                     │  notmuch new        │                     │
-       │                     │                     │────────────────────►│                     │
-       │                     │                     │                     │                     │
-       │                     │                     │                     │  index messages      │
-       │                     │                     │                     │────────┐            │
-       │                     │                     │                     │        │            │
-       │                     │                     │                     │◄───────┘            │
-       │                     │                     │                     │                     │
-       │                     │                     │                     │                     │
-       │                     │                     │                     │                     │  user query
-       │                     │                     │                     │                     │◄────
-       │                     │                     │                     │                     │
-       │                     │                     │                     │  notmuch search     │
-       │                     │                     │                     │────────────────────►│
-       │                     │                     │                     │  result IDs         │
-       │                     │                     │                     │                     │
-       │                     │                     │                     │                     │  resolve IDs
-       │                     │                     │                     │                     │  to file paths
-       │                     │                     │                     │                     │────────┐
-       │                     │                     │                     │                     │        │
-       │                     │                     │                     │                     │◄───────┘
-       │                     │                     │                     │                     │
-       │                     │                     │                     │                     │  output paths
-       │                     │                     │                     │                     │────────┐
-       │                     │                     │                     │                     │        │
-       │                     │                     │                     │                     │◄───────┘
-       │                     │                     │                     │                     │
+  Remote (IMAP)       nmail sync            Maildir              notmuch            nmail search
+  ─────────────       ──────────            ───────              ───────            ───────────
+       │                     │                  │                    │                    │
+       │  fetch new mail     │                  │                    │                    │
+       │◄───────────────────►│                  │                    │                    │
+       │  via mbsync         │                  │                    │                    │
+       │                     │                  │                    │                    │
+       │                     │  write to        │                    │                    │
+       │                     │  incoming/new/   │                    │                    │
+       │                     │─────────────────►│                    │                    │
+       │                     │                  │                    │                    │
+       │                     │  fire hook:      │                    │                    │
+       │                     │  mail:new        │                    │                    │
+       │                     │──────┐           │                    │                    │
+       │                     │      │           │                    │                    │
+       │                     │◄─────┘           │                    │                    │
+       │                     │                  │                    │                    │
+       │                     │                  │  notmuch new       │                    │
+       │                     │                  │───────────────────►│                    │
+       │                     │                  │                    │                    │
+       │                     │                  │                    │  index messages     │
+       │                     │                  │                    │──────┐             │
+       │                     │                  │                    │      │             │
+       │                     │                  │                    │◄─────┘             │
+       │                     │                  │                    │                    │
+       │                     │                  │                    │                    │
+       │                     │                  │                    │                    │  user query
+       │                     │                  │                    │                    │◄────
+       │                     │                  │                    │                    │
+       │                     │                  │                    │  notmuch search    │
+       │                     │                  │                    │───────────────────►│
+       │                     │                  │  result IDs        │                    │
+       │                     │                  │                    │                    │
+       │                     │                  │                    │                    │  resolve IDs
+       │                     │                  │                    │                    │  to file paths
+       │                     │                  │                    │                    │──────┐
+       │                     │                  │                    │                    │      │
+       │                     │                  │                    │                    │◄─────┘
+       │                     │                  │                    │                    │
+       │                     │                  │                    │                    │  output paths
+       │                     │                  │                    │                    │──────┐
+       │                     │                  │                    │                    │      │
+       │                     │                  │                    │                    │◄─────┘
+       │                     │                  │                    │                    │
 ```
 
 ## Hook Architecture
 
 ```
-── Operation ──► mail-<command> ──► ~/Mail/logs/mail.log
+── Operation ──► nmail <subcommand> ──► ~/Mail/logs/mail.log
                        │
                        ▼
               ~/.config/nmail/hooks.d/
@@ -194,7 +194,7 @@
               ┌────────┼────────┐
               ▼        ▼        ▼
          on-new     on-sent   on-error
-         .sh        .sh       .sh
+                    .sh       .sh
               │        │        │
               ▼        ▼        ▼
          notify-send  move to  retry

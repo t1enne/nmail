@@ -11,10 +11,10 @@
 
 ---
 
-## mail-compose
+## nmail compose
 
 ```
-mail-compose [options] [template-name|draft-file]
+nmail compose [options] [template-name|draft-file]
 
 Create or edit a mail draft.
 
@@ -49,10 +49,10 @@ Exit codes:
 
 ---
 
-## mail-render
+## nmail render
 
 ```
-mail-render [options] <input-file>
+nmail render [options] <input-file>
 
 Convert a Markdown draft or queue file into RFC5322 MIME message.
 Output to stdout.
@@ -67,7 +67,6 @@ Options:
 The input file format:
   Header block (RFC822 style) until `---` separator
   Markdown body
-  Optional `---` separator followed by attachment list
 
 Attachments can be:
   - Absolute paths
@@ -77,26 +76,24 @@ Attachments can be:
 Pipeline:
   1. Parse headers
   2. Extract Markdown body
-  3. Convert to HTML via `pandoc -f markdown -t html`
-  4. Build multipart/alternative MIME:
+  3. Build multipart/alternative MIME:
      - text/plain (Markdown as-is)
-     - text/html (pandoc output)
-  5. Encode attachments as base64 MIME parts
-  6. Add Content-Type, MIME-Version, Date, Message-ID
-  7. Output complete RFC5322 message
+     - text/html (raw Markdown in <pre>)
+  4. Encode attachments as base64 MIME parts
+  5. Add Content-Type, MIME-Version, Date, Message-ID
+  6. Output complete RFC5322 message
 
 Exit codes:
   0   Rendered successfully
   1   Parse error
-  2   pandoc not found (and HTML needed)
 ```
 
 ---
 
-## mail-send
+## nmail send
 
 ```
-mail-send [options] [draft-file...]
+nmail send [options] [draft-file...]
 
 Send queued messages via SMTP (msmtp).
 
@@ -114,7 +111,7 @@ Behavior:
   1. Acquires lock (~/.local/state/nmail/queue-lock)
   2. For each file in queue/new/ (or specified files):
      a. Moves to queue/tmp/
-     b. Runs mail-render on it
+     b. Runs nmail render on it
      c. Pipes rendered output to `msmtp -t`
      d. On success: moves to sent/cur/
      e. On failure: moves to queue/cur/ with error annotation
@@ -129,10 +126,10 @@ Exit codes:
 
 ---
 
-## mail-sync
+## nmail sync
 
 ```
-mail-sync [options]
+nmail sync [options]
 
 Synchronize maildir with remote IMAP server(s).
 
@@ -160,10 +157,10 @@ Exit codes:
 
 ---
 
-## mail-watch
+## nmail watch
 
 ```
-mail-watch [options]
+nmail watch [options]
 
 Watch Maildir for changes and fire events.
 
@@ -188,10 +185,10 @@ Exit codes:
 
 ---
 
-## mail-open
+## nmail open
 
 ```
-mail-open <id|path>
+nmail open <id|path>
 
 Open a mail message in $PAGER.
 
@@ -218,10 +215,10 @@ Exit codes:
 
 ---
 
-## mail-reply
+## nmail reply
 
 ```
-mail-reply <id|path>
+nmail reply <id|path>
 
 Create a reply draft from an existing message.
 
@@ -252,10 +249,10 @@ Exit codes:
 
 ---
 
-## mail-forward
+## nmail forward
 
 ```
-mail-forward <id|path>
+nmail forward <id|path>
 
 Create a forward draft from an existing message.
 
@@ -283,10 +280,10 @@ Exit codes:
 
 ---
 
-## mail-search
+## nmail search
 
 ```
-mail-search [options] <query>
+nmail search [options] <query>
 
 Search mail index. Uses notmuch if available, falls back to rg.
 
@@ -308,23 +305,23 @@ Fallback (no notmuch):
   Outputs file paths.
 
 Interactive mode:
-  mail-search --interactive <query>
+  nmail search --interactive <query>
     Opens fzf with preview pane showing rendered message.
     On selection: outputs selected file path.
 
 Examples:
-  mail-search tag:unread
-  mail-search from:alice subject:invoice
-  mail-search rust --interactive
-  mail-search tag:todo --format paths
+  nmail search tag:unread
+  nmail search from:alice subject:invoice
+  nmail search rust --interactive
+  nmail search tag:todo --format paths
 ```
 
 ---
 
-## mail-tag
+## nmail tag
 
 ```
-mail-tag <operation> <tag> <id...>
+nmail tag <operation> <tag> <id...>
 
 Add or remove notmuch tags. Requires notmuch.
 
@@ -337,20 +334,20 @@ Arguments:
   id...  One or more message IDs or file paths
 
 Examples:
-  mail-tag +todo 182
-  mail-tag -unread 182 193 204
-  mail-search tag:todo --format ids | mail-tag +reviewed -
+  nmail tag +todo 182
+  nmail tag -unread 182 193 204
+  nmail search tag:todo --format ids | nmail tag +reviewed -
 
 Reads IDs from stdin if "-" is given as id argument:
-  mail-tag +archived -
+  nmail tag +archived -
 ```
 
 ---
 
-## mail-archive
+## nmail archive
 
 ```
-mail-archive <id...>
+nmail archive <id...>
 
 Move message(s) from incoming/ to archive/cur/.
 
@@ -373,10 +370,10 @@ Exit codes:
 
 ---
 
-## mail-trash
+## nmail trash
 
 ```
-mail-trash <id...>
+nmail trash <id...>
 
 Move message(s) to trash/cur/.
 
@@ -404,10 +401,10 @@ Exit codes:
 
 ---
 
-## mail-contacts
+## nmail contacts
 
 ```
-mail-contacts [options] [query]
+nmail contacts [options] [query]
 
 Manage and search contacts extracted from mail.
 
@@ -427,17 +424,17 @@ With --update:
   Writes to ~/.local/state/nmail/contacts.tsv
 
 Examples:
-  mail-contacts alice              # find contacts matching "alice"
-  mail-contacts --update           # rebuild cache
-  mail-contacts | fzf | cut -f2    # interactive contact picker
+  nmail contacts alice              # find contacts matching "alice"
+  nmail contacts --update           # rebuild cache
+  nmail contacts | fzf | cut -f2    # interactive contact picker
 ```
 
 ---
 
-## mail-template
+## nmail template
 
 ```
-mail-template <operation> [name]
+nmail template <operation> [name]
 
 Manage compose templates.
 
@@ -456,17 +453,17 @@ Built-in templates:
   forward.md     Forward headers
 
 Examples:
-  mail-template list
-  mail-template show default
-  mail-template create meeting
+  nmail template list
+  nmail template show default
+  nmail template create meeting
 ```
 
 ---
 
-## mail-status
+## nmail status
 
 ```
-mail-status [options]
+nmail status [options]
 
 Show mailbox status overview.
 
@@ -489,10 +486,10 @@ Exit codes:
 
 ---
 
-## mail-log
+## nmail log
 
 ```
-mail-log [options]
+nmail log [options]
 
 Query the structured activity log.
 
@@ -507,17 +504,17 @@ Log format (one JSON line per event):
   {"ts":"2026-07-13T14:30:00Z","event":"mail:new","count":3}
 
 Examples:
-  mail-log --follow
-  mail-log --since 2h --level 2
-  mail-log --event error
+  nmail log --follow
+  nmail log --since 2h --level 2
+  nmail log --event error
 ```
 
 ---
 
-## mail-attach
+## nmail attach
 
 ```
-mail-attach <operation> [args]
+nmail attach <operation> [args]
 
 Manage the attachment directory.
 
@@ -530,17 +527,17 @@ Operation:
 Attachments are stored in ~/Mail/attachments/<msg-id>/
 
 Examples:
-  mail-attach list
-  mail-attach save 182 ./invoice.pdf
-  mail-attach open 182 1
+  nmail attach list
+  nmail attach save 182 ./invoice.pdf
+  nmail attach open 182 1
 ```
 
 ---
 
-## mail-hook
+## nmail hook
 
 ```
-mail-hook <event> [args...]
+nmail hook <event> [args...]
 
 Manually trigger hook scripts.
 
@@ -553,25 +550,25 @@ Behavior:
   Each gets event name + args as positional parameters
 
 Examples:
-  mail-hook new 3
-  mail-hook sent queue-abc123
-  mail-hook error queue-abc123 "SMTP timeout"
+  nmail hook new 3
+  nmail hook sent queue-abc123
+  nmail hook error queue-abc123 "SMTP timeout"
 ```
 
 ---
 
-## mail-session
+## nmail session
 
 ```
-mail-session [options]
+nmail session [options]
 
 Launch tmux workspace for nmail.
 
 Options:
   --layout grid      4-pane grid layout (default)
   --layout windows   Separate tmux windows per function
-  --no-sync          Don't run mail-sync on launch
-  --no-watch         Don't start mail-watch
+  --no-sync          Don't run nmail sync on launch
+  --no-watch         Don't start nmail watch
   --project NAME     Tmux session name (default: "mail")
 
 Behavior:
@@ -589,11 +586,11 @@ Behavior:
     Window layout:
       1: compose  (nvim ~/Mail/drafts/)
       2: inbox    (lf ~/Mail/incoming/)
-      3: search   (ready for mail-search)
+      3: search   (ready for nmail search)
       4: contacts (less ~/.local/state/nmail/contacts.tsv)
       5: queue    (lf ~/Mail/queue/new/)
       6: logs     (tail -f ~/Mail/logs/mail.log)
-      7: sync     (mail-sync)
+      7: sync     (nmail sync)
       8: shell
 
   Attaches to existing session if one exists with same name.

@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-Every `mail-*` command is a Unix filter. Input from stdin/files, output to stdout/files.
+Every `nmail` subcommand is a Unix filter. Input from stdin/files, output to stdout/files.
 Compose with pipes, xargs, fzf, jq, etc. No monolithic client needed.
 
 ---
@@ -11,19 +11,18 @@ Compose with pipes, xargs, fzf, jq, etc. No monolithic client needed.
 
 ```bash
 # Open most recent 10 messages, pick one with fzf
-mail-search --format paths tag:unread --limit 50 \
+nmail search --format paths tag:unread --limit 50 \
   | while read f; do echo "$(head -50 "$f" | grep '^Subject:' | head -1)  $f"; done \
   | fzf --preview 'bat --language=email {2}' \
   | awk '{print $NF}' \
-  | xargs mail-open
+  | xargs nmail open
 
 # Open oldest unread
-mail-search --format paths --sort oldest-first tag:unread --limit 1 \
-  | xargs mail-open
+nmail search --format paths --sort oldest-first tag:unread --limit 1 \
+  | xargs nmail open
 
 # Count unread
-mail-search tag:unread --limit 0 2>&1 | grep -oP 'Found \K\d+'
-# Or: mail-status --json | jq '.incoming.new'
+nmail status --json | jq '.incoming.new'
 ```
 
 ---
@@ -32,18 +31,18 @@ mail-search tag:unread --limit 0 2>&1 | grep -oP 'Found \K\d+'
 
 ```bash
 # Compose new mail to Alice
-mail-compose --to alice@example.com --subject "Meeting notes"
+nmail compose --to alice@example.com --subject "Meeting notes"
 
 # Compose from template
-mail-compose meeting --to team@example.com
+nmail compose meeting --to team@example.com
 
 # Compose and queue immediately (non-interactive)
 echo -e "To: bob@example.com\nSubject: Test\n\n---\n\nHello." \
-  | mail-compose --stdin
+  | nmail compose --stdin
 
 # Batch compose from file list
 while read to subject; do
-  mail-compose --to "$to" --subject "$subject"
+  nmail compose --to "$to" --subject "$subject"
 done < recipients.txt
 ```
 
@@ -53,22 +52,22 @@ done < recipients.txt
 
 ```bash
 # Send everything in queue
-mail-send
+nmail send
 
 # Send specific draft
-mail-send ~/Mail/drafts/meeting.md
+nmail send ~/Mail/drafts/meeting.md
 
 # Send with retries
-mail-send --retry 3
+nmail send --retry 3
 
 # Preview what would be sent (dry-run)
-mail-send --dry-run | bat --language=email
+nmail send --dry-run | bat --language=email
 
 # Send only pending (not failed)
-mail-send        # (only drains queue/new/)
+nmail send        # (only drains queue/new/)
 
 # Retry failed sends
-mail-send --all  # (includes queue/cur/ failures)
+nmail send --all  # (includes queue/cur/ failures)
 ```
 
 ---
@@ -77,25 +76,25 @@ mail-send --all  # (includes queue/cur/ failures)
 
 ```bash
 # Full-text search for invoice
-mail-search invoice
+nmail search invoice
 
 # Search with notmuch tags
-mail-search tag:unread from:alice
+nmail search tag:unread from:alice
 
 # Interactive search → open
-mail-search --interactive tag:unread
+nmail search --interactive tag:unread
 
 # Search → archive all results (read from stdin)
-mail-search --format ids tag:todo \
-  | mail-archive -
+nmail search --format ids tag:todo \
+  | nmail archive -
 
 # Search → tag all results
-mail-search --format ids from:bob \
-  | mail-tag +bob -
+nmail search --format ids from:bob \
+  | nmail tag +bob -
 
 # Search → forward each result to someone
-mail-search --format paths subject:report \
-  | while read msg; do mail-forward "$msg" --to manager@example.com; done
+nmail search --format paths subject:report \
+  | while read msg; do nmail forward "$msg" --to manager@example.com; done
 ```
 
 ---
@@ -104,16 +103,16 @@ mail-search --format paths subject:report \
 
 ```bash
 # Tag all from Bob
-mail-search --format ids from:bob | mail-tag +bob -
+nmail search --format ids from:bob | nmail tag +bob -
 
 # Remove unread tag (mark as read)
-mail-tag -unread 182 193 204
+nmail tag -unread 182 193 204
 
 # Tag chain: find → tag → archive
-mail-search --format ids subject:newsletter \
-  | mail-tag +newsletter - \
-  && mail-search --format ids tag:newsletter \
-  | mail-archive -
+nmail search --format ids subject:newsletter \
+  | nmail tag +newsletter - \
+  && nmail search --format ids tag:newsletter \
+  | nmail archive -
 ```
 
 ---
@@ -121,19 +120,17 @@ mail-search --format ids subject:newsletter \
 ## Archiving and Trashing
 
 ```bash
-# Archive all read messages
-mail-search --format paths tag:unread --limit 0 >/dev/null  # not much
-# Better: archive by age
-find ~/Mail/incoming/cur -mtime +30 | xargs mail-archive
+# Archive by age
+find ~/Mail/incoming/cur -mtime +30 | xargs nmail archive
 
 # Trash old sent mail
-find ~/Mail/sent/cur -mtime +365 | xargs mail-trash
+find ~/Mail/sent/cur -mtime +365 | xargs nmail trash
 
 # Empty trash older than 30 days
-mail-trash --age 30 --force
+nmail trash --age 30 --force
 
 # Archive all from mailing list
-mail-search --format ids from:lists.example.com | mail-archive -
+nmail search --format ids from:lists.example.com | nmail archive -
 ```
 
 ---
@@ -142,19 +139,19 @@ mail-search --format ids from:lists.example.com | mail-archive -
 
 ```bash
 # Find Alice's email
-mail-contacts alice
+nmail contacts alice
 
 # Interactive contact picker → compose
-mail-contacts \
+nmail contacts \
   | fzf --preview 'echo {}' \
   | cut -f2 \
-  | xargs -I{} mail-compose --to {}
+  | xargs -I{} nmail compose --to {}
 
 # Rebuild contact database
-mail-contacts --update
+nmail contacts --update
 
 # Export contacts
-mail-contacts --format json | jq '.[] | select(.count > 10)'
+nmail contacts --format json | jq '.[] | select(.count > 10)'
 ```
 
 ---
@@ -163,13 +160,13 @@ mail-contacts --format json | jq '.[] | select(.count > 10)'
 
 ```bash
 # Check status
-mail-status
+nmail status
 
 # Watch status (refresh every 10s)
-watch -n 10 mail-status
+watch -n 10 nmail status
 
 # JSON status for scripting
-mail-status --json | jq '.queue | "pending: \(.pending), failed: \(.failed)"'
+nmail status --json | jq '.queue | "pending: \(.pending), failed: \(.failed)"'
 
 # Count messages per tag
 for tag in inbox unread todo archive; do
@@ -183,14 +180,14 @@ done
 
 ```bash
 # List templates
-mail-template list
+nmail template list
 
 # Create template from existing draft
 cp ~/Mail/drafts/good-draft.md ~/Mail/templates/project-update.md
-mail-template edit project-update
+nmail template edit project-update
 
 # Compose from template with fzf picker
-mail-template list | fzf | xargs mail-compose
+nmail template list | fzf | xargs nmail compose
 ```
 
 ---
@@ -199,19 +196,19 @@ mail-template list | fzf | xargs mail-compose
 
 ```bash
 # Follow live log
-mail-log --follow
+nmail log --follow
 
 # Errors in last hour
-mail-log --since 1h --level 3
+nmail log --since 1h --level 3
 
 # All send events today
-mail-log --since 2026-07-13 --event send
+nmail log --since 2026-07-13 --event send
 
 # Count sync events
-mail-log --event sync --json | jq -s 'length'
+nmail log --event sync --json | jq -s 'length'
 
 # Recent new mail notifications
-mail-log --event new --json | jq -r '"\(.ts) — \(.count) new"'
+nmail log --event new --json | jq -r '"\(.ts) — \(.count) new"'
 ```
 
 ---
@@ -220,15 +217,15 @@ mail-log --event new --json | jq -r '"\(.ts) — \(.count) new"'
 
 ```bash
 # List attachments from message 182
-mail-attach list 182
+nmail attach list 182
 
 # Save first attachment
-mail-attach save 182 ./file.pdf
+nmail attach save 182 ./file.pdf
 
 # Extract all PDFs from unread mail
-mail-search --format paths tag:unread \
+nmail search --format paths tag:unread \
   | while read msg; do
-      mail-attach save "$msg" "./attachments/"
+      nmail attach save "$msg" "./attachments/"
     done
 ```
 
@@ -238,44 +235,44 @@ mail-search --format paths tag:unread \
 
 ```bash
 # Find all GitHub notification emails → tag → archive
-mail-search --format ids from:notifications@github.com \
-  | mail-tag +github - \
+nmail search --format ids from:notifications@github.com \
+  | nmail tag +github - \
   && sleep 1 \
-  && mail-search --format ids tag:github \
-  | mail-archive -
+  && nmail search --format ids tag:github \
+  | nmail archive -
 
 # Daily digest: count by sender
-mail-search --format paths --limit 0 \
+nmail search --format paths --limit 0 \
   | xargs grep -h '^From:' \
   | sort | uniq -c | sort -rn | head -20
 
 # Reply to all unread with template
-mail-search --format paths tag:unread \
+nmail search --format paths tag:unread \
   | while read msg; do
-      mail-reply "$msg" --template quick-reply
+      nmail reply "$msg" --template quick-reply
     done
 
 # Find messages with attachments
-mail-search --format paths "" \
+nmail search --format paths "" \
   | xargs grep -l 'Content-Disposition: attachment' \
-  | while read msg; do mail-tag +has-attachment "$msg"; done
+  | while read msg; do nmail tag +has-attachment "$msg"; done
 
-# Pipe rendered email to a spellcheck
-mail-render ~/Mail/queue/new/abc123 | aspell list
+# Pipe rendered email to spellcheck
+nmail render ~/Mail/queue/new/abc123 | aspell list
 
 # Generate report: messages per day this week
-mail-search --format paths --sort oldest-first --limit 0 \
+nmail search --format paths --sort oldest-first --limit 0 \
   | xargs stat -c '%y' \
   | cut -d' ' -f1 \
   | sort | uniq -c
 
 # Batch reply: same template to multiple threads
 for id in 182 193 204; do
-  cat template.md | mail-reply "$id" --stdin
+  cat template.md | nmail reply "$id" --stdin
 done
 
 # Sync → index → notify pipeline
-mail-sync && notmuch new && mail-status --json \
+nmail sync && notmuch new && nmail status --json \
   | jq -r '"New: \(.incoming.new), Total: \(.incoming.total)"' \
   | xargs notify-send "Mail"
 ```
@@ -286,8 +283,8 @@ mail-sync && notmuch new && mail-status --json \
 
 ```bash
 # fzf-based mail browser
-function mail-fzf() {
-  mail-search --format paths "$@" \
+function nmail-fzf() {
+  nmail search --format paths "$@" \
     | while read f; do
         subj=$(grep -m1 '^Subject:' "$f" | sed 's/^Subject: //')
         from=$(grep -m1 '^From:' "$f" | sed 's/^From: //')
@@ -299,23 +296,23 @@ function mail-fzf() {
           --preview='bat --language=email --color=always {4}' \
           --preview-window=right:60% \
     | cut -f4 \
-    | xargs -r mail-open
+    | xargs -r nmail open
 }
 
-# Usage: mail-fzf tag:unread
-# Usage: mail-fzf from:alice
+# Usage: nmail-fzf tag:unread
+# Usage: nmail-fzf from:alice
 ```
 
 ## rg Fallback (no notmuch)
 
 ```bash
 # Search all mail with ripgrep
-function mail-grep() {
+function nmail-grep() {
   rg -l "$1" ~/Mail/incoming/ ~/Mail/archive/ ~/Mail/sent/
 }
 
 # fzf with rg
-function mail-fzf-grep() {
+function nmail-fzf-grep() {
   rg -l "$1" ~/Mail/incoming/ ~/Mail/archive/ ~/Mail/sent/ \
     | while read f; do
         subj=$(grep -m1 '^Subject:' "$f" | sed 's/^Subject: //')
@@ -325,6 +322,6 @@ function mail-fzf-grep() {
           --with-nth=1 \
           --preview='bat --language=email {2}' \
     | cut -f2 \
-    | xargs -r mail-open
+    | xargs -r nmail open
 }
 ```

@@ -1,6 +1,6 @@
 # nmail — terminal-first mail client
 
-> **Status:** Early development. Compose, render, send working.
+> **Status:** All 19 subcommands implemented. Compose, render, send, sync, search, reply, forward, tag, archive, trash, contacts, watch, session, hooks, templates, attachments all working.
 > All commands under single `nmail` binary.
 
 ## Philosophy
@@ -161,10 +161,10 @@ uv run nmail --help
 ## Implementation Status
 
 - [x] Phase 0 (MVP): compose, render, send, open, status, log
-- [ ] Phase 1: sync, search, reply, forward, tag, archive, trash, contacts, watch
-- [ ] Phase 2: tmux session, hooks
-- [ ] Phase 3: templates, attachments, plugins
-- [ ] Phase 4: community extensions
+- [x] Phase 1: sync, search, reply, forward, tag, archive, trash, contacts, watch
+- [x] Phase 2: tmux session, hooks
+- [x] Phase 3: templates, attachments
+- [ ] Phase 4: plugins, community extensions
 
 ## License
 

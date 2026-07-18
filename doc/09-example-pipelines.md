@@ -1,13 +1,13 @@
 # Example Shell Pipelines
 
-> All examples assume `~/Mail/` exists and commands are in `PATH`.
+> All examples assume `~/Mail/` exists and `nmail` is in `PATH`.
 
 ---
 
 ## 1. Quick Status Check
 
 ```bash
-$ mail-status
+$ nmail status
 Incoming:  3 new, 147 total
 Archive:   1204 total
 Sent:      89 total
@@ -23,7 +23,7 @@ Last sync: 2026-07-13 14:30:00
 
 ```bash
 # Find all unread from Alice, pick with fzf preview, open
-$ mail-search --format paths tag:unread from:alice \
+$ nmail search --format paths tag:unread from:alice \
   | while read f; do
       subj=$(grep -m1 '^Subject:' "$f" | sed 's/^Subject: //')
       date=$(grep -m1 '^Date:' "$f" | sed 's/^Date: //')
@@ -31,7 +31,7 @@ $ mail-search --format paths tag:unread from:alice \
     done \
   | fzf --with-nth=1.. --preview='bat --language=email {2}' \
   | awk '{print $NF}' \
-  | xargs mail-open
+  | xargs nmail open
 ```
 
 ---
@@ -40,27 +40,21 @@ $ mail-search --format paths tag:unread from:alice \
 
 ```bash
 # Compose a new message
-$ mail-compose --to alice@example.com --subject "Meeting tomorrow"
+$ nmail compose --to alice@example.com --subject "Meeting tomorrow"
 
-# nvim opens, user writes:
-#   Hello Alice,
-#   Let's meet at 2pm.
-#   Thanks,
-#   John
-# User saves and exits (:wq)
+# nvim opens, user writes draft, saves and exits (:wq)
+# nmail compose validates and moves to queue/new/
 
-# mail-compose validates and moves to queue/new/
-
-$ mail-status
+$ nmail status
 Queue: 1 pending
 
-# Send (via cron, systemd timer, or manual)
-$ mail-send
+# Send
+$ nmail send
 
-$ mail-status
+$ nmail status
 Queue: 0 pending
 
-$ mail-log --since 1m
+$ nmail log --since 1m
 [2026-07-13T14:32:00Z] mail:sent abc123
 ```
 
@@ -70,23 +64,24 @@ $ mail-log --since 1m
 
 ```bash
 # See new mail from Bob
-$ mail-search tag:unread from:bob --format summary
+$ nmail search tag:unread from:bob --format summary
 2026-07-13 14:00  Bob Smith   Re: Project update    [id:204]
 
 # Reply
-$ mail-reply 204
+$ nmail reply 204
 
 # nvim opens with:
 #   To: Bob Smith <bob@example.com>
 #   Subject: Re: Project update
-#   ...
+#   In-Reply-To: <original-message-id>
+#   References: <accumulated>
+#   ---
 #   On ..., Bob Smith wrote:
 #   > original text quoted
 
 # Write reply, save, exit. Draft queued.
-
 # Send later
-$ mail-send
+$ nmail send
 ```
 
 ---
@@ -95,16 +90,16 @@ $ mail-send
 
 ```bash
 # Tag all newsletters
-$ mail-search --format ids from:newsletter@example.com | mail-tag +newsletter -
+$ nmail search --format ids from:newsletter@example.com | nmail tag +newsletter -
 
 # Tag all from work domain
-$ mail-search --format ids from:@company.com | mail-tag +work -
+$ nmail search --format ids from:@company.com | nmail tag +work -
 
 # Archive all read newsletters older than 30 days
-$ mail-search --format paths tag:newsletter \
+$ nmail search --format paths tag:newsletter \
   | xargs ls -t \
   | tail -n +30 \
-  | mail-archive -
+  | nmail archive -
 ```
 
 ---
@@ -113,18 +108,18 @@ $ mail-search --format paths tag:newsletter \
 
 ```bash
 # Find Alice's addresses
-$ mail-contacts alice
+$ nmail contacts alice
 Alice Smith    alice@example.com      47
 Alice Wong     alice.w@company.com    12
 
 # Interactive picker → compose
-$ mail-contacts \
+$ nmail contacts \
   | fzf --header='Pick recipient' \
   | awk '{print $2}' \
-  | xargs -I{} mail-compose --to {}
+  | xargs -I{} nmail compose --to {}
 
 # Rebuild cache (run in cron weekly)
-$ mail-contacts --update
+$ nmail contacts --update
 ```
 
 ---
@@ -133,18 +128,18 @@ $ mail-contacts --update
 
 ```bash
 # Follow log in real-time
-$ mail-log --follow
+$ nmail log --follow
 {"ts":"2026-07-13T14:30:00Z","event":"mail:sync-end","count":3}
 {"ts":"2026-07-13T14:30:01Z","event":"mail:new","count":3}
 {"ts":"2026-07-13T14:32:00Z","event":"mail:sent","id":"abc123"}
 ...
 
 # Check for errors today
-$ mail-log --since 24h --level 3
+$ nmail log --since 24h --level 3
 {"ts":"2026-07-13T10:15:00Z","event":"mail:error","id":"def456","error":"SMTP timeout"}
 
 # Count events by type
-$ mail-log --json --since 7d \
+$ nmail log --json --since 7d \
   | jq -r '.event' \
   | sort | uniq -c | sort -rn
 34 mail:sync-end
@@ -163,11 +158,11 @@ $ ls ~/Mail/queue/new/ | wc -l
 3
 
 # Preview first queued message
-$ mail-render ~/Mail/queue/new/$(ls ~/Mail/queue/new/ | head -1) \
+$ nmail render ~/Mail/queue/new/$(ls ~/Mail/queue/new/ | head -1) \
   | bat --language=email
 
 # Send all
-$ mail-send
+$ nmail send
 Sent 3 messages. 0 failed.
 
 # Check for failures
@@ -175,7 +170,7 @@ $ ls ~/Mail/queue/cur/ | wc -l
 0
 
 # Retry failed sends
-$ mail-send --all
+$ nmail send --all
 ```
 
 ---
@@ -184,16 +179,16 @@ $ mail-send --all
 
 ```bash
 # Find messages with attachments
-$ mail-search --format paths "" | xargs grep -l 'Content-Disposition: attachment'
+$ nmail search --format paths "" | xargs grep -l 'Content-Disposition: attachment'
 
 # Save attachment from message 182
-$ mail-attach save 182 ./report.pdf
+$ nmail attach save 182 ./report.pdf
 
 # Save all PDFs from unread
-$ mail-search --format paths tag:unread \
+$ nmail search --format paths tag:unread \
   | while read msg; do
       id=$(basename "$msg" | cut -d: -f1)
-      mail-attach save "$id" ~/Downloads/
+      nmail attach save "$id" ~/Downloads/
     done
 ```
 
@@ -204,7 +199,7 @@ $ mail-search --format paths tag:unread \
 ```bash
 # 1. Install
 $ git clone https://github.com/user/nmail ~/dev/nmail
-$ cd ~/dev/nmail && ./install.sh
+$ cd ~/dev/nmail && uv sync
 
 # 2. Configure msmtp and mbsync (one-time)
 $ $EDITOR ~/.msmtprc
@@ -214,10 +209,10 @@ $ $EDITOR ~/.mbsyncrc
 $ $EDITOR ~/.config/nmail/config.toml
 
 # 4. Initial sync
-$ mail-sync
+$ nmail sync
 
 # 5. Launch workspace
-$ mail-session
+$ nmail session
 
 # tmux session opens:
 # ┌──────────┬──────────┐
@@ -233,24 +228,23 @@ $ mail-session
 
 ```bash
 # Morning: check new mail
-$ mail-sync
+$ nmail sync
 
 # or just launch session (syncs on start)
-$ mail-session
+$ nmail session
 
 # In tmux:
 #   Top-left pane (nvim): compose replies
 #   Top-right pane (lf): browse inbox
 #   Bottom-left: tail -f logs
-#   Bottom-right: mail-search --interactive tag:unread
+#   Bottom-right: nmail search --interactive tag:unread
 
 # Read important mail
-# In search pane: mail-search tag:unread --interactive
+# In search pane: nmail search tag:unread --interactive
 # fzf picker → Enter to open → read → :q
-# Back in search pane: mail-reply <id> (composes in top-left pane)
 
 # Archive after reading
-# In inbox pane (lf): select message → press 'a' (maps to mail-archive)
+# In inbox pane (lf): select message → press 'a'
 
 # Compose new
 # In top-left pane: :e new-draft.md
@@ -258,8 +252,8 @@ $ mail-session
 # Auto-queued. Sent by background process.
 
 # End of day: check queue
-$ mail-status
-$ mail-send   # flush anything remaining
+$ nmail status
+$ nmail send   # flush anything remaining
 ```
 
 ---
@@ -276,19 +270,19 @@ echo "Daily Mail Digest — $(date +%Y-%m-%d)" > "$DIGEST"
 echo >> "$DIGEST"
 
 echo "## Unread" >> "$DIGEST"
-mail-search --format summary tag:unread --limit 20 >> "$DIGEST"
+nmail search --format summary tag:unread --limit 20 >> "$DIGEST"
 
 echo >> "$DIGEST"
 echo "## Sent Today" >> "$DIGEST"
-mail-status --json | jq -r '.sent' >> "$DIGEST"
+nmail status --json | jq -r '.sent' >> "$DIGEST"
 
 echo >> "$DIGEST"
 echo "## Errors" >> "$DIGEST"
-mail-log --since 24h --level 3 --json \
+nmail log --since 24h --level 3 --json \
   | jq -r '"  - \(.error)"' >> "$DIGEST"
 
-mail-compose --to me@example.com --subject "Daily Digest" --stdin < "$DIGEST"
-mail-send
+nmail compose --to me@example.com --subject "Daily Digest" --stdin < "$DIGEST"
+nmail send
 
 rm "$DIGEST"
 ```
@@ -298,8 +292,8 @@ rm "$DIGEST"
 # auto-tag.sh — auto-tag messages based on rules
 
 while IFS='|' read -r pattern tag; do
-    mail-search --format ids "from:$pattern AND NOT tag:$tag" \
-        | mail-tag "+$tag" -
+    nmail search --format ids "from:$pattern AND NOT tag:$tag" \
+        | nmail tag "+$tag" -
 done < ~/.config/nmail/auto-tags.tsv
 ```
 
@@ -316,16 +310,16 @@ newsletter@example.com|newsletter
 
 ```bash
 # Use mu instead of notmuch for search
-$ alias mail-search='mu find --format=plain'
+$ alias nmail search='mu find --format=plain'
 
-# Use yazi instead of lf in mail-session
-$ NM_FILE_BROWSER=yazi mail-session
+# Use yazi instead of lf in nmail session
+$ NM_FILE_BROWSER=yazi nmail session
 
 # Use glow to render markdown emails
-$ mail-open 182 | glow -
+$ nmail open 182 | glow -
 
 # Use delta for diffing draft revisions
-$ diff <(mail-render draft-v1.md) <(mail-render draft-v2.md) | delta
+$ diff <(nmail render draft-v1.md) <(nmail render draft-v2.md) | delta
 
 # Export to MBOX
 $ find ~/Mail/archive/cur -type f | xargs cat > archive.mbox
@@ -355,7 +349,10 @@ Description=Mail sync
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/mail-sync
+ExecStart=%h/.local/bin/nmail sync
+
+[Install]
+WantedBy=timers.target
 ```
 
 ```ini
@@ -378,7 +375,10 @@ Description=Drain mail queue
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/mail-send
+ExecStart=%h/.local/bin/nmail send
+
+[Install]
+WantedBy=timers.target
 ```
 
 ```bash
