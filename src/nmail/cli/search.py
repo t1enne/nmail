@@ -28,8 +28,9 @@ from ..shared import _all_maildir_files
     default="summary",
 )
 @click.option("--limit", "-n", type=int, default=50)
+@click.option("--quiet", "-q", is_flag=True, help="Suppress result count on stderr")
 @click.argument("query", required=False)
-def search(interactive: bool, fmt: str, limit: int, query: str | None) -> None:
+def search(interactive: bool, fmt: str, limit: int, quiet: bool, query: str | None) -> None:
     """Search your mail.
 
     Uses notmuch for tagged/full-text search.
@@ -52,7 +53,7 @@ def search(interactive: bool, fmt: str, limit: int, query: str | None) -> None:
     if interactive:
         _search_interactive(query or "")
     else:
-        _search_noninteractive(query or "", fmt, limit)
+        _search_noninteractive(query or "", fmt, limit, quiet)
 
 
 def _search_interactive(query: str) -> None:
@@ -180,7 +181,7 @@ def _print_summary(paths: list[str]) -> None:
         click.echo(_summary_line(p))
 
 
-def _search_noninteractive(query: str, fmt: str, limit: int) -> None:
+def _search_noninteractive(query: str, fmt: str, limit: int, quiet: bool) -> None:
     raw = notmuch_search(query) if query else _all_maildir_files()
     total = len(raw)
     results = raw[:limit]
@@ -189,10 +190,11 @@ def _search_noninteractive(query: str, fmt: str, limit: int) -> None:
         click.echo("No results.", err=True)
         return
 
-    if total > limit:
-        click.echo(f"{total} results (showing first {limit})", err=True)
-    else:
-        click.echo(f"{total} results", err=True)
+    if not quiet:
+        if total > limit:
+            click.echo(f"{total} results (showing first {limit})", err=True)
+        else:
+            click.echo(f"{total} results", err=True)
 
     if fmt == "json":
         click.echo(json.dumps(results))
