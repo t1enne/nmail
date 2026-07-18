@@ -8,6 +8,7 @@ import time
 import click
 
 from ..maildir import MAILDIR_SUBDIRS, maildir_list_new, maildir_total
+from ..notmuch import notmuch_count, notmuch_available
 
 
 @click.command()
@@ -33,11 +34,18 @@ def status(as_json: bool, watch_mode: bool) -> None:
 
 
 def _status_print(as_json: bool) -> None:
-    stats = {
+    stats: dict[str, dict[str, int]] = {
         d: {"total": maildir_total(d), "new": len(maildir_list_new(d))} for d in MAILDIR_SUBDIRS
     }
+    # Include notmuch unread count for incoming folder
+    if notmuch_available():
+        unread = notmuch_count("tag:unread")
+        stats["incoming"]["unread"] = unread
     if as_json:
         click.echo(json.dumps(stats))
     else:
         for name, s in stats.items():
-            click.echo(f"{name:12s}  {s['total']:4d} total  {s['new']:4d} new")
+            line = f"{name:12s}  {s['total']:4d} total  {s['new']:4d} new"
+            if "unread" in s:
+                line += f"  {s['unread']:4d} unread"
+            click.echo(line)

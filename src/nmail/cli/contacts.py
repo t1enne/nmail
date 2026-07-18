@@ -50,9 +50,12 @@ def contacts(update: bool, fmt: str, query: str | None) -> None:
 
 
 def _rebuild_contacts(path: Path) -> None:
+    click.echo("Scanning mailbox for contacts...", err=True)
     counter: dict[tuple[str, str], int] = {}
     for subdir in ("incoming", "archive", "sent"):
-        for msg in maildir_list_all(subdir):
+        msgs = maildir_list_all(subdir)
+        click.echo(f"  {subdir}: {len(msgs)} messages", err=True)
+        for msg in msgs:
             for hdr in ("From", "To", "Cc"):
                 val = extract_header(msg, hdr)
                 if not val:

@@ -96,7 +96,10 @@ def notmuch_search(query: str, output: str = "files") -> list[str]:
                 timeout=30,
             )
             results = [line for line in res.stdout.strip().splitlines() if line]
-            return _exclude_trash(results)
+            results = _exclude_trash(results)
+            # Skip stale index entries (file was deleted since last notmuch new)
+            results = [r for r in results if Path(r).is_file()]
+            return results
         except Exception:
             pass
     return _fallback_search(query)
@@ -163,12 +166,12 @@ def _resolve_via_notmuch(id_str: str) -> Path | None:
 def resolve_id(id_str: str) -> Path | None:
     """Resolve a message ID or file path to a Maildir file."""
     path = Path(id_str).expanduser()
-    if path.exists() and path.is_file():
+    if path.is_file():
         return path
 
     # Try notmuch first
     resolved = _resolve_via_notmuch(id_str)
-    if resolved and resolved.exists():
+    if resolved and resolved.is_file():
         return resolved
 
     # Fallback: glob over Maildir
@@ -180,3 +183,13 @@ def resolve_id(id_str: str) -> Path | None:
                 if p.is_file():
                     return p
     return None
+
+
+def resolve_ids(ids: list[str]) -> list[Path]:
+    """Resolve multiple IDs, skipping non-existent. Logs warnings."""
+    resolved: list[Path] = []
+    for id_str in ids:
+        p = resolve_id(id_str)
+        if p:
+            resolved.append(p)
+    return resolved

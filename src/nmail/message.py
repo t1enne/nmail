@@ -26,7 +26,10 @@ def render_mail(path: Path) -> str:
     """Render a mail file as readable markdown-style text.
 
     Returns headers in bold, a separator, then the decoded body.
+    Returns empty string if file not found.
     """
+    if not path.exists() or not path.is_file():
+        return ""
     raw = path.read_text(errors="replace")
     msg = email.message_from_string(raw, policy=email.policy.compat32)
 

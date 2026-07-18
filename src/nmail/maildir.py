@@ -93,6 +93,8 @@ def has_flag(path: Path, flag: str) -> bool:
 
 def mark_read(path: Path) -> Path:
     """Move from new/ to cur/ and add seen flag."""
+    if not path.is_file():
+        return path
     cfg = get_config()
     for subdir in MAILDIR_SUBDIRS:
         new_dir = cfg.maildir / subdir / "new"

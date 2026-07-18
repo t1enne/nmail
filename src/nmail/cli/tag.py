@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 
 import click
 
+from ..config import get_config
 from ..logging import log_event
 from ..notmuch import notmuch_tag
 
@@ -40,6 +42,21 @@ def tag(operation: str, ids: tuple[str, ...]) -> None:
                     resolved.append(line)
         else:
             resolved.append(id_str)
+
+    # Warn on IDs that notmuch doesn't know about
+    cfg = get_config()
+    if cfg.notmuch_enabled:
+        for rid in resolved:
+            try:
+                r = subprocess.run(
+                    [cfg.notmuch_command, "search", "--output=files", f"id:{rid}"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if not r.stdout.strip():
+                    click.echo(f"ID not found: {rid}", err=True)
+            except Exception:
+                pass
+
     for rid in resolved:
         notmuch_tag(operation, rid)
     log_event("mail:tag", operation, str(len(resolved)))

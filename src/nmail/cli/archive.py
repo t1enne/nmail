@@ -22,7 +22,7 @@ def archive(ids: tuple[str, ...]) -> None:
     nmail search --format ids tag:todo | nmail archive -
     """
     if not ids:
-        raise click.UsageError("archive requires at least one message ID")
+        raise click.UsageError("archive requires at least one message ID or - for stdin")
     files = _resolve_ids(ids)
     for f in files:
         maildir_transfer(f, "archive")

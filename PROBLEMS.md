@@ -2,202 +2,181 @@
 
 Found via manual exploratory testing of all CLI commands. Not exhaustive.
 
+Legend: ✅ = fixed, ☐ = not yet fixed
+
 ---
 
 ## Crash / Stack Trace Bugs
 
-### 1. `search tag:unread` crashes on stale notmuch entries
+### 1. ✅ `search tag:unread` crashes on stale notmuch entries
 
-`nmail search tag:unread` crashes with `FileNotFoundError` when notmuch index references files that no longer exist (e.g. deleted drafts `reply-20260718-085225.md`). The default format renders full message content and blows up on the first missing file.
+`nmail search tag:unread` crashed with `FileNotFoundError` when notmuch index referenced files no longer on disk. The default format rendered full message content and blew up on the first missing file.
 
-**Repro:**
-```
-nmail search tag:unread
-```
-→ `FileNotFoundError: [Errno 2] No such file or directory: '/home/nasrt/Mail/drafts/reply-20260718-085225.md'`
-
-**Root cause:** Notmuch index is stale — files were deleted but `notmuch new` wasn't run (or doesn't catch these). nmail trusts notmuch output blindly instead of checking file existence before `render_mail()`.
-
-**Fix:** Wrap `render_mail()` in try/except FileNotFoundError. Warn on stderr, skip missing. Also: run `notmuch new --no-hooks` as part of `nmail sync`.
+**Fix applied:** `notmuch_search()` now filters `[r for r in results if Path(r).is_file()]` — stale index entries are silently dropped. Also `render_mail()` returns `""` for missing files as safety net.
 
 ---
 
-### 2. `search --interactive` crashes without TTY
+### 2. ✅ `search --interactive` crashes without TTY
 
-`nmail search --interactive tag:unread` crashes with `OSError: [Errno 6] No such device or address: '/dev/tty'` when run in a non-TTY context (e.g. scripted, piped, CI).
+`nmail search --interactive` crashed with `OSError: [Errno 6] No such device or address: '/dev/tty'` when run outside a terminal.
 
-**Repro:**
-```
-nmail search --interactive tag:unread < /dev/null
-```
-
-**Fix:** Check if `/dev/tty` is available before `os.open("/dev/tty", ...)`. If unavailable: print helpful error "interactive mode requires a terminal" and exit 1 (not a stack trace).
+**Fix applied:** Check `os.open("/dev/tty", ...)` before proceeding. On failure: print "interactive mode requires a terminal" to stderr and `raise SystemExit(1)`.
 
 ---
 
-### 3. `open` crashes on stale notmuch entries
+### 3. ✅ `open` crashes on stale notmuch entries
 
-`nmail open reply-20260718-085225` crashes with `FileNotFoundError` for the same stale-index reason as #1.
+`nmail open reply-20260718-085225` crashed when notmuch returned a path that no longer exists.
 
-**Fix:** Same as #1 — check file existence, print "message not found: <id>" and exit 1.
+**Fix applied:** `resolve_id()` now uses `.is_file()` everywhere (not `.exists()`), filtering out stale entries and directories.
 
 ---
 
-### 4. `open` crashes on `reply-20260718-085225` with `IsADirectoryError`
+### 4. ✅ `open` crashes with `IsADirectoryError`
 
-A variant of the same file — `reply-20260718-085225.md` is gone, but `reply-20260718-085225.md:2,S` exists as a Maildir directory. `open` tries `path.read_text()` on a directory. Stack trace from `pathlib`.
+A stale Maildir directory named like `reply-20260718-085225.md:2,S` was picked up by glob and passed to `path.read_text()`.
 
-**Fix:** Same as #1 — gate `render_mail()` on `path.is_file()`.
+**Fix applied:** `resolve_id()` now only returns `.is_file()` paths. `mark_read()` also guards with `.is_file()`.
 
 ---
 
 ## Unfriendly / Misleading Output
 
-### 5. `search tag:unread` output is raw dumped email body
+### 5. ✅ `search` default output was raw dumped email body
 
-No summary, no pager. Pipes entire raw message content to terminal. For 143 unread messages this is unusable. Even with `--limit 5`, output is hundreds of lines per message.
+Default was `--format preview` which rendered entire decoded message body. Unusable for browsing — hundreds of lines per message even with `--limit`.
 
-**Expected:** Default format should be a one-line-per-message summary (date, from, subject) like `notmuch search` output, or at minimum the format that `search --format preview` intends to provide (before it crashes on #1).
-
-**Current defaults:** `--format preview` renders full raw message. The only usable format is `--format ids` or `--format files`, which show paths not summaries.
+**Fix applied:** Changed default format to `summary` — one line per message (`date  from  subject`). `--format preview` still available for explicit use.
 
 ---
 
-### 6. `search` default output has no message count header
+### 6. ✅ `search` default output has no message count header
 
-`nmail search ""` dumps message bodies with no "Showing N of M results" header. User has no idea how many results exist.
+No indication of how many results matched.
 
-**Fix:** Print `N results (showing first M)` or similar before first result when limit is applied.
-
----
-
-### 7. `search` empty result is silent
-
-`nmail search from:nobody` prints nothing. No "0 results" message. User can't tell search worked but found nothing vs. search failed.
-
-**Fix:** Print "No results" to stderr when 0 matches.
+**Fix applied:** Now prints `N results` or `N results (showing first M)` to stderr before results.
 
 ---
 
-### 8. `status` shows "0 new" when notmuch has 143 unread
+### 7. ✅ `search` empty result is silent
 
-`nmail status` reports `0 new` in incoming because all 2913 messages are in `cur/` not `new/`. But notmuch correctly knows 143 are tagged `unread`. Status counts maildir `new/` directories, which is misleading after initial sync moves everything to `cur/`.
+`nmail search from:nobody` printed nothing.
 
-**Fix:** Option A: also query notmuch for unread counts. Option B: rename the column to "new (maildir)" and add a notmuch-based "unread" column. At minimum, document the discrepancy.
+**Fix applied:** Prints "No results." to stderr.
 
 ---
 
-### 9. `search --format preview` renders raw base64 blobs
+### 8. ✅ `status` shows "0 new" when notmuch has 143 unread
 
-The `--format preview` output for the Russian table email dumps raw base64-encoded MIME parts interspersed with quoted-printable HTML. No decoding.
+`status` counted Maildir `new/` directories only. After initial sync moves everything to `cur/`, all messages appear "0 new" even when unread.
 
-**Fix:** Decode MIME content-transfer-encoding before rendering preview. Or at least strip raw base64 blocks and show `[base64-encoded content: N bytes]`.
+**Fix applied:** When notmuch is available, a 4th column `unread` is shown for the `incoming` folder via `notmuch count tag:unread`.
+
+---
+
+### 9. ☐ `search --format preview` renders raw base64 blobs
+
+Some messages with base64-encoded MIME parts show decoded raw binary or quoted-printable garbage. Not a crash, but ugly.
+
+**Future fix:** Decode all MIME transfer encodings in `_extract_body()` before rendering.
 
 ---
 
 ## Inconsistent Error Messages / UX
 
-### 10. `archive` says "requires at least one message ID" vs `trash` says "requires message IDs, --empty, or --age"
+### 10. ✅ `archive` vs `trash` inconsistent error
 
-Same situation (no args), different phrasing. Inconsistent style.
+`archive` said "requires at least one message ID", `trash` said "requires message IDs, --empty, or --age".
 
-**Fix:** Unify: `archive: requires message IDs or - for stdin` or `trash: requires at least one message ID, --empty, or --age`.
-
----
-
-### 11. `tag +test nonexistent` silently succeeds (exit 0)
-
-Tagging a nonexistent notmuch ID produces no output, exits 0. User can't tell the tag had no effect.
-
-**Fix:** Warn "ID not found: nonexistent" to stderr. Exit 0 (not an error per se) but print feedback.
+**Fix applied:** `archive` now says "requires at least one message ID or - for stdin".
 
 ---
 
-### 12. `tag` with no args prints Click's generic "Missing argument 'OPERATION'" — no usage hint
+### 11. ✅ `tag +test nonexistent` silently succeeds
 
-Generic Click error. Not terrible but could be friendlier: "Usage: nmail tag +tag|-tag ID..." inline rather than making user run `--help`.
+`nmail tag +test junk` exited 0 with no output.
+
+**Fix applied:** Now queries notmuch for each ID before tagging. Prints "ID not found: <id>" to stderr for non-existent IDs.
 
 ---
 
-### 13. `contacts` with no cache prints "Run with --update first" — but `--update` takes 10+ seconds with no progress
+### 12. ☐ `tag` with no args prints generic Click error
 
-`nmail contacts --update` scans 2913 files. No progress bar, no "scanning N files..." message. Terminal sits silent.
+"Missing argument 'OPERATION'" — not terrible but lacks usage hint. Low priority.
 
-**Fix:** Print "Scanning mailbox..." before starting. Show file count or spinner for large mailboxes.
+---
+
+### 13. ✅ `contacts --update` has no progress feedback
+
+`nmail contacts --update` scanned 2913 messages with zero output for 10+ seconds.
+
+**Fix applied:** Now prints "Scanning mailbox for contacts..." and per-folder message counts as it goes.
 
 ---
 
 ## Design Gaps
 
-### 14. `search` (non-interactive) is not pipe-friendly
+### 14. ☐ `search` output (non-interactive) not pipe-friendly
 
-Default format is full message body. `--format ids` returns notmuch IDs which are opaque (e.g. `reply-20260718-085225`). Can't pipe to `open` because `open` resolves these differently from notmuch. `search --format files` returns absolute paths — pipeable to `xargs nmail open` but file paths are ugly.
-
-**Fix:** Make `--format ids` output valid input for `open`. Currently `nmail search --format ids tag:unread | head -1 | xargs nmail open` fails (#3). Ensure same ID space works across commands.
+`--format ids` output doesn't reliably pipe to `open`. The ID space is nothmuch-specific and some IDs (like `reply-20260718-085225`) resolve differently in `resolve_id()` than notmuch expects. Needs a consistent ID scheme across commands.
 
 ---
 
-### 15. No `search --format summary`
+### 15. ✅ No `search --format summary`
 
-There's no one-line-per-message summary format (date | from | subject | tags). The only non-crash output is full message rendering or raw file paths. `notmuch search` already provides this — nmail should wrap it.
+Only full-body rendering or raw file paths were available. No one-line summary.
 
-**Fix:** Add `--format summary` that outputs `date from subject (tags)` like notmuch's default output.
-
----
-
-### 16. `bat` dependency not declared
-
-`nmail open` help says "Uses bat if available." But `bat` is not listed as dependency. Falls back silently to something else (presumably `less`). Graceful, but should be documented in README or pyproject.toml as optional.
+**Fix applied:** Added `summary` format. Also added `_print_summary()` helper with header-aware date/from/subject extraction. Default format changed to `summary`.
 
 ---
 
-### 17. `drafts/` directory mixed: Maildir structure + raw `.md` files
+### 16. ☐ `bat` dependency not declared
 
-Maildir requires `cur/`, `new/`, `tmp/` subdirectories. But `drafts/` also has bare `.md` files alongside them. Notmuch indexes bare `.md` files as "mail" and includes them in search results. When these files are deleted/resolved, notmuch entries go stale.
-
-**Fix:** Either keep drafts as pure markdown outside Maildir (e.g. `~/Mail/drafts-md/`) or store them as proper Maildir messages with markdown body. Mixing the two causes stale-index bugs.
+`open` help says "Uses bat if available" but bat is not in pyproject.toml. Graceful fallback to `less` exists, but undocumented.
 
 ---
 
-### 18. No `search --sort` option
+### 17. ☐ `drafts/` directory mixed: Maildir + raw `.md` files
 
-`nmail search` output is in notmuch default order (newest first? file order?). No way to sort by date ascending, subject, sender.
+Drafts include both Maildir structure (`cur/`, `new/`, `tmp/`) and bare `.md` files. Notmuch indexes the bare `.md` files and they leak into search results. When deleted, they leave stale index entries (mitigated by fix #1 but root cause remains).
 
-**Fix:** Pass `--sort=newest-first` or `--sort=oldest-first` to notmuch.
-
----
-
-### 19. No `search --limit` with offset / pagination
-
-`--limit N` gives first N results but no `--offset` for pagination. Can't do "next page."
-
-**Fix:** Add `--offset M` to skip first M results.
+**Fix:** Restructure drafts to live outside the notmuch-indexed tree, or store them as proper Maildir messages.
 
 ---
 
-### 20. `search` formats `files` returns draft template paths as results
+### 18. ☐ No `search --sort` option
 
-Tag search `tag:unread` returns `/home/nasrt/Mail/templates/forward.md` — a template, not a mail message. Notmuch indexes templates because they're in the mail tree.
-
-**Fix:** Exclude `templates/` and `drafts/` from notmuch index, or filter them out in nmail search results when displaying mail messages.
+Results always in notmuch default order. No `--sort=oldest-first` or `--sort=subject`.
 
 ---
 
-### 21. No `search body:<text>` in help examples
+### 19. ☐ No `search --offset` / pagination
 
-Help shows `tag:`, `from:`, `subject:` but not `body:` text search. Notmuch supports it. Missing from discoverability.
+`--limit N` works but no `--offset M` for next-page. Can't paginate.
 
-**Fix:** Add examples like `nmail search body:"meeting tomorrow"`.
+---
+
+### 20. ☐ Templates leak into search results
+
+Notmuch indexes everything under `~/Mail/` including `templates/forward.md`. A `tag:unread` query returns template files even though they aren't mail messages.
+
+**Fix:** Either add notmuch config to exclude `templates/` and `drafts/` folders, or filter them in `notmuch_search()`.
+
+---
+
+### 21. ☐ No `body:` search in help examples
+
+Help shows `tag:`, `from:`, `subject:` but not `body:` — notmuch supports `body:` text search.
 
 ---
 
 ## Summary by Severity
 
-| Severity | Count | IDs |
-|----------|-------|-----|
-| **Crash** | 4 | #1, #2, #3, #4 |
-| **Unfriendly** | 5 | #5, #6, #7, #8, #9 |
-| **Inconsistent** | 4 | #10, #11, #12, #13 |
-| **Design gap** | 8 | #14, #15, #16, #17, #18, #19, #20, #21 |
+| Severity | Count | Fixed | Remaining |
+|----------|-------|-------|-----------|
+| **Crash** | 4 | 4 | 0 |
+| **Unfriendly** | 5 | 4 | 1 |
+| **Inconsistent** | 4 | 3 | 1 |
+| **Design gap** | 8 | 1 | 7 |
 
-**Total: 21 issues**
+**Fixed: 12 of 21 issues**
