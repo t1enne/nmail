@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import os
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Final
 
 from .config import get_config
 from .constants import MAILDIR_SUBDIRS, MAILDIR_SUBFOLDERS
+
+logger = logging.getLogger(__name__)
 
 # ── Maildir path helpers ─────────────────────────────────────────────────────
 
@@ -39,6 +44,7 @@ def maildir_move(src: Path, dst_dir: str) -> Path:
     dest = dest_dir / src.name
     # rename is atomic on same filesystem
     os.rename(src, dest)
+    _refresh_notmuch()
     return dest
 
 
@@ -65,6 +71,24 @@ def _set_suffix(path: Path, flags: str) -> Path:
     return path.with_name(new_name)
 
 
+def _refresh_notmuch() -> None:
+    """Incrementally re-index notmuch after a file rename/move.
+
+    Keeps notmuch's index in sync with Maildir so searches and
+    counts don't drift between syncs.
+    """
+    cfg = get_config()
+    if not cfg.notmuch_enabled:
+        return
+    notmuch_cmd = cfg.notmuch_command
+    with contextlib.suppress(Exception):
+        subprocess.run(
+            [notmuch_cmd, "new"],
+            capture_output=True,
+            timeout=30,
+        )
+
+
 def add_flag(path: Path, flag: str) -> Path:
     code = FLAG_MAP.get(flag, flag)
     current = set(_flag_suffix(path))
@@ -73,6 +97,7 @@ def add_flag(path: Path, flag: str) -> Path:
     new_path = _set_suffix(path, new_flags)
     if new_path != path:
         os.rename(path, new_path)
+        _refresh_notmuch()
     return new_path
 
 
@@ -84,6 +109,7 @@ def remove_flag(path: Path, flag: str) -> Path:
     new_path = _set_suffix(path, new_flags)
     if new_path != path:
         os.rename(path, new_path)
+        _refresh_notmuch()
     return new_path
 
 
@@ -105,9 +131,11 @@ def mark_read(path: Path) -> Path:
                 cur_dir.mkdir(parents=True, exist_ok=True)
                 dest = cur_dir / path.name
                 os.rename(path, dest)
+                _refresh_notmuch()
                 return add_flag(dest, "seen")
         except ValueError:
             continue
+    _refresh_notmuch()
     return add_flag(path, "seen")
 
 
