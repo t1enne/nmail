@@ -5,18 +5,36 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def _folded_value(lines: list[str], start: int) -> str:
+    """Collect a folded header value starting at `start`, handling RFC2822 continuation lines."""
+    _, _, val = lines[start].partition(":")
+    parts = [val.strip()]
+    for i in range(start + 1, len(lines)):
+        line = lines[i]
+        if line == "":
+            break
+        if line[0] in (" ", "\t"):
+            parts.append(line.strip())
+        else:
+            break
+    return " ".join(parts)
+
+
 def extract_header(path: Path, header: str) -> str | None:
     """Extract a specific header value from a mail file."""
     text = path.read_text(errors="replace")
     lines = text.split("\n")
     lower = header.lower()
-    for line in lines:
-        if line.strip() == "":
+    for i, line in enumerate(lines):
+        if line == "":
             break  # end of headers
+        # Skip continuation lines (folded header values)
+        if line[0] in (" ", "\t"):
+            continue
         if ":" in line:
-            key, _, val = line.partition(":")
+            key, _, _ = line.partition(":")
             if key.strip().lower() == lower:
-                return val.strip()
+                return _folded_value(lines, i)
     return None
 
 

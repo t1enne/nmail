@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
 import click
 
 from ..config import get_config
 from ..headers import extract_headers_block
 from ..maildir import mark_read
+from ..message import render_mail
 from ..notmuch import resolve_id
 
 
@@ -39,8 +42,15 @@ def open_cmd(headers_only: bool, raw_mode: bool, id: str) -> None:
     elif headers_only:
         click.echo(extract_headers_block(path))
     else:
+        rendered = render_mail(path)
         cfg = get_config()
-        if os.path.exists("/usr/bin/bat") or os.path.exists("/usr/local/bin/bat"):
-            os.execvp("bat", ["bat", "-l", "email", str(path)])
-        else:
-            os.execvp(cfg.pager, [cfg.pager, str(path)])
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(rendered)
+            tmp = f.name
+        try:
+            if os.path.exists("/usr/bin/bat") or os.path.exists("/usr/local/bin/bat"):
+                os.execvp("bat", ["bat", "-l", "markdown", tmp])
+            else:
+                os.execvp(cfg.pager, [cfg.pager, tmp])
+        finally:
+            Path(tmp).unlink(missing_ok=True)
