@@ -12,17 +12,17 @@ from ..config import get_config
 from ..headers import extract_headers_block
 from ..maildir import mark_read
 from ..message import render_mail
-from ..notmuch import resolve_id
+from ..shared import _resolve_ids
 
 
 @click.command("open")
 @click.option("--headers-only", is_flag=True)
 @click.option("--raw", "raw_mode", is_flag=True)
-@click.argument("id")
-def open_cmd(headers_only: bool, raw_mode: bool, id: str) -> None:
+@click.argument("ids", nargs=-1)
+def open_cmd(headers_only: bool, raw_mode: bool, ids: tuple[str, ...]) -> None:
     """Open a message in your pager.
 
-    Resolves ID via notmuch or file listing. Marks as read
+    Resolves IDs via notmuch or file listing. Marks as read
     (moves new/ to cur/). Uses bat if available.
 
     Examples:
@@ -31,11 +31,17 @@ def open_cmd(headers_only: bool, raw_mode: bool, id: str) -> None:
     nmail open ~/Mail/incoming/new/...
     nmail open --headers-only 182
     nmail open --raw 182
+    nmail search --format ids --limit 1 from:google | nmail open -
     """
-    path = resolve_id(id)
-    if not path:
-        click.echo(f"nmail open: message not found: {id}", err=True)
+    if not ids:
+        raise click.UsageError("open requires at least one message ID")
+    paths = _resolve_ids(ids)
+    if not paths:
+        click.echo("nmail open: no messages found", err=True)
         raise SystemExit(1)
+    if len(paths) > 1:
+        click.echo(f"nmail open: multiple messages ({len(paths)}), opening first", err=True)
+    path = paths[0]
     mark_read(path)
     if raw_mode:
         click.echo(path.read_text(errors="replace"))
