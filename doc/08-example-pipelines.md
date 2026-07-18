@@ -210,16 +210,6 @@ $ $EDITOR ~/.config/nmail/config.toml
 
 # 4. Initial sync
 $ nmail sync
-
-# 5. Launch workspace
-$ nmail session
-
-# tmux session opens:
-# ┌──────────┬──────────┐
-# │ compose  │ inbox    │
-# ├──────────┼──────────┤
-# │ shell    │ search   │
-# └──────────┴──────────┘
 ```
 
 ---
@@ -230,26 +220,11 @@ $ nmail session
 # Morning: check new mail
 $ nmail sync
 
-# or just launch session (syncs on start)
-$ nmail session
-
-# In tmux:
-#   Top-left pane (nvim): compose replies
-#   Top-right pane (lf): browse inbox
-#   Bottom-left: tail -f logs
-#   Bottom-right: nmail search --interactive tag:unread
-
-# Read important mail
-# In search pane: nmail search tag:unread --interactive
-# fzf picker → Enter to open → read → :q
-
-# Archive after reading
-# In inbox pane (lf): select message → press 'a'
+# Read new mail
+$ nmail search --interactive tag:unread
 
 # Compose new
-# In top-left pane: :e new-draft.md
-# Write, save: :wq
-# Auto-queued. Sent by background process.
+$ nmail compose --to "team@example.com" --subject "Daily standup notes"
 
 # End of day: check queue
 $ nmail status
@@ -311,9 +286,6 @@ newsletter@example.com|newsletter
 ```bash
 # Use mu instead of notmuch for search
 $ alias nmail search='mu find --format=plain'
-
-# Use yazi instead of lf in nmail session
-$ NM_FILE_BROWSER=yazi nmail session
 
 # Use glow to render markdown emails
 $ nmail open 182 | glow -

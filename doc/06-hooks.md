@@ -168,7 +168,7 @@ nmail plugin remove my-plugin
 
 ### Plugin Loading
 
-On startup, `nmail session` (and any command that fires hooks):
+On startup, any command that fires hooks:
 
 1. Read `~/.config/nmail/config.toml` → `plugins.enabled`
 2. For each enabled plugin:

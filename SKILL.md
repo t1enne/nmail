@@ -197,19 +197,6 @@ nmail watch --no-hooks               # Don't fire hook scripts
 
 Uses inotifywait if available, otherwise polls every 5s.
 
-### Session
-
-Launch tmux workspace.
-
-```bash
-nmail session                        # Create/attach tmux session
-nmail session --no-sync              # Skip sync on launch
-nmail session --no-watch             # Skip watcher pane
-nmail session --layout windows       # Window layout (vs grid)
-```
-
-Grid layout: status (top-left), interactive search (top-right), watch (bottom).
-
 ### Template
 
 Manage draft templates in `~/Mail/templates/`. Built-in: `default`, `reply`, `forward`.
@@ -311,11 +298,6 @@ interval = 300
 [notmuch]
 enabled = true
 command = "notmuch"
-
-[tmux]
-session = "mail"
-layout = "grid"
-command = "tmux"
 
 [templates]
 dir = "~/Mail/templates"

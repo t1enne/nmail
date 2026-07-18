@@ -1,8 +1,5 @@
 # nmail — terminal-first mail client
 
-> **Status:** All 19 subcommands implemented. Compose, render, send, sync, search, reply, forward, tag, archive, trash, contacts, watch, session, hooks, templates, attachments all working.
-> All commands under single `nmail` binary.
-
 ## Philosophy
 
 nmail treats email as data (Maildir + Markdown), not as a GUI object.
@@ -38,27 +35,26 @@ nmail compose
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `nmail compose` | Create/edit draft |
-| `nmail render` | Markdown → RFC5322 MIME |
-| `nmail send` | Send queued mail via msmtp |
-| `nmail sync` | Sync Maildir via mbsync |
-| `nmail watch` | Watch Maildir, fire events |
-| `nmail open` | Open message in pager |
-| `nmail reply` | Create reply draft |
-| `nmail forward` | Create forward draft |
-| `nmail search` | Search mail (notmuch) |
-| `nmail tag` | Add/remove notmuch tags |
-| `nmail archive` | Move to archive |
-| `nmail trash` | Move to trash / empty trash |
-| `nmail contacts` | Extract/query contacts |
-| `nmail template` | Manage draft templates |
-| `nmail status` | Mailbox statistics |
-| `nmail log` | Query activity log |
-| `nmail attach` | Manage attachments |
-| `nmail hook` | Trigger hook scripts |
-| `nmail session` | Launch tmux workspace |
+| Command          | Description                 |
+| ---------------- | --------------------------- |
+| `nmail compose`  | Create/edit draft           |
+| `nmail render`   | Markdown → RFC5322 MIME     |
+| `nmail send`     | Send queued mail via msmtp  |
+| `nmail sync`     | Sync Maildir via mbsync     |
+| `nmail watch`    | Watch Maildir, fire events  |
+| `nmail open`     | Open message in pager       |
+| `nmail reply`    | Create reply draft          |
+| `nmail forward`  | Create forward draft        |
+| `nmail search`   | Search mail (notmuch)       |
+| `nmail tag`      | Add/remove notmuch tags     |
+| `nmail archive`  | Move to archive             |
+| `nmail trash`    | Move to trash / empty trash |
+| `nmail contacts` | Extract/query contacts      |
+| `nmail template` | Manage draft templates      |
+| `nmail status`   | Mailbox statistics          |
+| `nmail log`      | Query activity log          |
+| `nmail attach`   | Manage attachments          |
+| `nmail hook`     | Trigger hook scripts        |
 
 ## Draft Format
 
@@ -142,7 +138,7 @@ uv run nmail --help
 ## Dependencies
 
 **Required:** Python ≥3.11, click
-**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search), nvim (editor), lf (file browser), fzf (picker), bat (pager)
+**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search), nvim (editor), fzf (picker), bat (pager)
 **Optional:** ripgrep (search fallback), inotify-tools (watch), notify-send (notifications)
 
 ## Documentation
@@ -152,17 +148,16 @@ uv run nmail --help
 - `doc/02-process-flows.md` — Compose→Send, Sync→Search flows
 - `doc/03-cli-spec.md` — Complete CLI specification
 - `doc/04-configuration.md` — Configuration format and hooks
-- `doc/05-tmux-session.md` — mail-session launcher
 - `doc/06-composability.md` — Example shell pipelines
 - `doc/07-hooks.md` — Plugin and hook architecture
-- `doc/08-implementation-plan.md` — Staged plan (MVP through full)
+- `doc/08-implementation-plan.md` — Staged plan
 - `doc/09-example-pipelines.md` — Usage examples
 
 ## Implementation Status
 
 - [x] Phase 0 (MVP): compose, render, send, open, status, log
 - [x] Phase 1: sync, search, reply, forward, tag, archive, trash, contacts, watch
-- [x] Phase 2: tmux session, hooks
+- [x] Phase 2: hooks
 - [x] Phase 3: templates, attachments
 - [ ] Phase 4: plugins, community extensions
 

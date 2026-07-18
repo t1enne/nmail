@@ -557,51 +557,6 @@ Examples:
 
 ---
 
-## nmail session
-
-```
-nmail session [options]
-
-Launch tmux workspace for nmail.
-
-Options:
-  --layout grid      4-pane grid layout (default)
-  --layout windows   Separate tmux windows per function
-  --no-sync          Don't run nmail sync on launch
-  --no-watch         Don't start nmail watch
-  --project NAME     Tmux session name (default: "mail")
-
-Behavior:
-  Creates a tmux session with:
-    Grid layout:
-      ┌──────────┬──────────┐
-      │ compose  │ inbox    │
-      │ (nvim)   │ (lf)     │
-      ├──────────┼──────────┤
-      │ shell    │ search   │
-      │ queue    │ (fzf)    │
-      │ logs     │          │
-      └──────────┴──────────┘
-
-    Window layout:
-      1: compose  (nvim ~/Mail/drafts/)
-      2: inbox    (lf ~/Mail/incoming/)
-      3: search   (ready for nmail search)
-      4: contacts (less ~/.local/state/nmail/contacts.tsv)
-      5: queue    (lf ~/Mail/queue/new/)
-      6: logs     (tail -f ~/Mail/logs/mail.log)
-      7: sync     (nmail sync)
-      8: shell
-
-  Attaches to existing session if one exists with same name.
-
-Exit codes:
-  0   Launched or attached
-  1   tmux not found
-```
-
----
-
 ## Common Options
 
 All commands share these:

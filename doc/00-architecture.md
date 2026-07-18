@@ -5,7 +5,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          USER                                       │
-│  shell pipeline, keybind, or nmail session tmux bootstrap           │
+│  shell pipeline or keybind                                         │
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │
         ┌───────────────────────┼───────────────────────┐
@@ -58,30 +58,15 @@
 
 4. **Queue-based sending.** `nmail compose` writes to `queue/new/`. A background sender (cron, systemd timer, or `nmail watch`) drains the queue through `msmtp` into `sent/`. Non-blocking.
 
-5. **Tmux is workspace, not application.** `nmail session` creates a tmux session with panes running NeoVim, lf/yazi, `tail -f` on logs. No custom TUI.
+5. **Event-driven via filesystem.** `inotifywait` on Maildir directories triggers hooks. New mail → notification → refresh. Queue drained → log event.
 
-6. **Event-driven via filesystem.** `inotifywait` on Maildir directories triggers hooks. New mail → notification → refresh. Queue drained → log event.
+6. **Plain-text configuration.** Single TOML file. No DSL, no database.
 
-7. **Plain-text configuration.** Single TOML file. No DSL, no database.
-
-8. **Optional integrations.** notmuch for search, mbsync for IMAP, msmtp for SMTP. Each is optional. Fall back to `grep`/`fd` for search when notmuch absent.
+7. **Optional integrations.** notmuch for search, mbsync for IMAP, msmtp for SMTP. Each is optional. Fall back to `grep`/`fd` for search when notmuch absent.
 
 ## Component Map
 
 ```
-                    ┌──────────────────────────┐
-                    │      nmail session        │
-                    │   (tmux bootstrap)        │
-                    └──────────┬───────────────┘
-                               │ orchestrates panes
-                ┌──────────────┼──────────────┐
-                ▼              ▼              ▼
-        ┌──────────┐   ┌──────────┐   ┌──────────┐
-        │ compose  │   │  inbox   │   │  search  │
-        │ (nvim)   │   │ (lf)     │   │ (fzf)    │
-        └──────────┘   └──────────┘   └──────────┘
-                │              │              │
-                ▼              ▼              ▼
         ┌──────────────────────────────────────────┐
         │           STANDALONE COMMANDS            │
         │  nmail compose, nmail open, nmail search,│

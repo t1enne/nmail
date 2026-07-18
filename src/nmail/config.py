@@ -107,18 +107,6 @@ class Config:
         return self._cfg.get("notmuch", {}).get("command", "notmuch")
 
     @property
-    def tmux_session(self) -> str:
-        return self._cfg.get("tmux", {}).get("session", "mail")
-
-    @property
-    def tmux_layout(self) -> str:
-        return self._cfg.get("tmux", {}).get("layout", "grid")
-
-    @property
-    def tmux_command(self) -> str:
-        return self._cfg.get("tmux", {}).get("command", "tmux")
-
-    @property
     def notifications_enabled(self) -> bool:
         return self._cfg.get("notifications", {}).get("enabled", True)
 

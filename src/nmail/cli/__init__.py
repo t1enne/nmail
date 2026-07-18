@@ -16,7 +16,6 @@ from .render import render_cmd
 from .reply import reply
 from .search import search
 from .send import send
-from .session import session
 from .status import status
 from .sync import sync
 from .tag import tag
@@ -45,7 +44,6 @@ main.add_command(archive, "archive")
 main.add_command(contacts, "contacts")
 main.add_command(tag, "tag")
 main.add_command(trash, "trash")
-main.add_command(session, "session")
 main.add_command(hook, "hook")
 main.add_command(watch, "watch")
 main.add_command(log_cmd, "log")

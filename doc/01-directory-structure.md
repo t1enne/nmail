@@ -87,12 +87,11 @@ nmail/
 │   ├── 02-process-flows.md
 │   ├── 03-cli-spec.md
 │   ├── 04-configuration.md
-│   ├── 05-tmux-session.md
-│   ├── 06-composability.md
-│   ├── 07-hooks.md
-│   ├── 08-implementation-plan.md
-│   ├── 09-example-pipelines.md
-│   └── 10-installation-and-e2e-guide.md
+│   ├── 05-composability.md
+│   ├── 06-hooks.md
+│   ├── 07-implementation-plan.md
+│   ├── 08-example-pipelines.md
+│   └── 09-installation-and-e2e-guide.md
 ├── pyproject.toml            # Python project config + deps
 ├── Makefile                  # format, lint, typecheck
 └── README.md

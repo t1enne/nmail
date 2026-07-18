@@ -6,7 +6,7 @@
 
 ## 1. What nmail Is
 
-nmail is a terminal-first mail client. Email lives in **Maildir** on disk, drafts are **Markdown**, every operation is a `nmail <subcommand>`, and **tmux** provides the workspace. No GUI, no Electron, no IMAP in-process — it delegates to `mbsync` (IMAP sync), `msmtp` (SMTP send), `notmuch` (full-text search/index).
+nmail is a terminal-first mail client. Email lives in **Maildir** on disk, drafts are **Markdown**, every operation is a `nmail <subcommand>`. No GUI, no Electron, no IMAP in-process — it delegates to `mbsync` (IMAP sync), `msmtp` (SMTP send), `notmuch` (full-text search/index).
 
 ```
 nmail search tag:unread | fzf | xargs nmail open
@@ -23,7 +23,6 @@ nmail contacts alice | fzf | xargs nmail compose --to
 | Tool             | Purpose                         | Package             |
 |------------------|----------------------------------|---------------------|
 | **Python** ≥3.11 | Runtime                          | `python3`           |
-| **tmux**         | Session/workspace manager        | `tmux`              |
 | **msmtp**        | SMTP relay (send)                | `msmtp` / `msmtp-mta` |
 | **mbsync**       | IMAP→Maildir sync                | `isync`             |
 
@@ -42,17 +41,17 @@ nmail contacts alice | fzf | xargs nmail compose --to
 
 **Debian/Ubuntu:**
 ```bash
-sudo apt install -y python3 tmux jq msmtp isync notmuch bat fzf ripgrep inotify-tools neovim
+sudo apt install -y python3 jq msmtp isync notmuch bat fzf ripgrep inotify-tools neovim
 ```
 
 **Arch:**
 ```bash
-sudo pacman -S python tmux jq msmtp isync notmuch bat fzf ripgrep inotify-tools neovim
+sudo pacman -S python jq msmtp isync notmuch bat fzf ripgrep inotify-tools neovim
 ```
 
 **macOS (Homebrew):**
 ```bash
-brew install python tmux jq msmtp isync notmuch bat fzf ripgrep neovim
+brew install python jq msmtp isync notmuch bat fzf ripgrep neovim
 ```
 
 ---
@@ -113,10 +112,6 @@ command = "notmuch"
 dir = "~/.config/nmail/hooks.d/"
 enabled = true
 
-[tmux]
-session = "mail"
-layout = "grid"
-command = "tmux"
 ```
 
 ### 4.2 ~/.msmtprc (SMTP)
@@ -331,32 +326,7 @@ nmail template list | fzf | xargs nmail compose
 
 ---
 
-## 9. Tmux Workspace
-
-```bash
-nmail session
-```
-
-4-pane grid:
-```
-┌──────────────────────┬──────────────────────┐
-│  compose (nvim)      │  inbox (lf)          │
-├──────────────────────┼──────────────────────┤
-│  shell + logs        │  search (fzf)        │
-└──────────────────────┴──────────────────────┘
-```
-
-Options:
-```bash
-nmail session --layout windows
-nmail session --no-sync
-nmail session --no-watch
-nmail session --project work
-```
-
----
-
-## 10. Monitoring
+## 9. Monitoring
 
 ```bash
 nmail watch --once
@@ -371,7 +341,7 @@ nmail status --watch
 
 ---
 
-## 11. Daily Workflow
+## 10. Daily Workflow
 
 ```bash
 # Morning
@@ -395,14 +365,11 @@ nmail search --format ids tag:newsletter | nmail archive -
 
 # Clean trash
 nmail trash --age 30 --force
-
-# Launch workspace
-nmail session
 ```
 
 ---
 
-## 12. Troubleshooting
+## 11. Troubleshooting
 
 **nmail send: "msmtp not found"**
 ```bash
@@ -422,7 +389,7 @@ nmail send --all   # retry failed
 
 ---
 
-## 13. Quick Reference
+## 12. Quick Reference
 
 | Task               | Command                                                   |
 |--------------------|-----------------------------------------------------------|
@@ -445,6 +412,5 @@ nmail send --all   # retry failed
 | Templates          | `nmail template list/edit/create/delete`                  |
 | Logs               | `nmail log --follow`                                      |
 | Watch              | `nmail watch &`                                           |
-| Launch workspace   | `nmail session`                                           |
 | Attachments        | `nmail attach list/save ID PATH`                          |
 | Fire hooks         | `nmail hook EVENT`                                        |

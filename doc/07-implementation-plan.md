@@ -10,7 +10,7 @@
 src/nmail/
 ├── cli.py                # Click entrypoint
 ├── cli_commands1.py      # compose, forward, open, render, reply, search, send, status, sync
-├── cli_commands2.py      # archive, attach, contacts, hook, log, session, tag, template, trash, watch
+├── cli_commands2.py      # archive, attach, contacts, hook, log, tag, template, trash, watch
 ├── config.py             # TOML config loader
 ├── constants.py          # Shared constants
 ├── drafts.py             # Draft parsing (MD + headers)
@@ -107,25 +107,9 @@ nmail watch &
 
 ---
 
-## Phase 2: tmux Workspace — Planned
+## Phase 2: Hooks — Planned
 
-**Goal:** Productive terminal workspace.
-
-### Commands
-
-- `nmail session` — tmux bootstrap
-
-### What works end of Phase 2
-
-```bash
-nmail session
-# → tmux session with 4 panes:
-#   compose (nvim) | inbox (lf)
-#   shell+log       | search (fzf)
-
-nmail session --layout windows
-# → 8 tmux windows
-```
+**Goal:** Event-driven automation.
 
 ### Composable pipelines work:
 
@@ -199,7 +183,7 @@ nmail plugin list
 ```
 Phase 0: Python ≥3.11, click, msmtp (optional: bat, nvim)
 Phase 1: + mbsync, notmuch, inotify-tools, fzf, ripgrep
-Phase 2: + tmux, lf
+Phase 2: N/A
 Phase 3: + jq
 Phase 4: + community-driven
 ```
@@ -212,7 +196,7 @@ Phase 4: + community-driven
 - [x] `nmail send` drains queue through msmtp successfully
 - [x] `nmail open` displays message in pager
 - [x] `nmail status` shows correct counts
-- [x] All commands work standalone (no tmux needed)
+- [x] All commands work standalone
 
 ### Phase 1
 - [ ] `nmail sync` fetches mail via mbsync
@@ -224,9 +208,7 @@ Phase 4: + community-driven
 - [ ] `nmail watch` detects new mail and fires events
 
 ### Phase 2
-- [ ] `nmail session` creates tmux workspace
-- [ ] Grid layout: 4 panes functional
-- [ ] Window layout: 8 windows functional
+- [ ] Hook system fires on all events
 - [ ] Shell pipelines demonstrated and documented
 
 ### Phase 3

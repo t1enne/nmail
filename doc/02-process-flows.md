@@ -227,8 +227,7 @@
 │                                                                  │
 │   Designed to run in background:                                 │
 │   ├─ systemd --user service                                      │
-│   ├─ tmux pane: nmail watch                                      │
-│   └─ Manual: nmail watch &                                       │
+│   ├─ Manual: nmail watch &                                       │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
