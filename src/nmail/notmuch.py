@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -78,6 +79,11 @@ ARCHIVE = "archive"
 SENT = "sent"
 
 
+def _exclude_trash(paths: list[str]) -> list[str]:
+    """Filter out any path whose parent directory contains 'trash' (case-insensitive)."""
+    return [p for p in paths if "trash" not in os.path.dirname(p).lower().split(os.sep)]
+
+
 def notmuch_search(query: str, output: str = "files") -> list[str]:
     """Search with notmuch, falling back to ripgrep over Maildir."""
     cfg = get_config()
@@ -89,7 +95,8 @@ def notmuch_search(query: str, output: str = "files") -> list[str]:
                 text=True,
                 timeout=30,
             )
-            return [line for line in res.stdout.strip().splitlines() if line]
+            results = [line for line in res.stdout.strip().splitlines() if line]
+            return _exclude_trash(results)
         except Exception:
             pass
     return _fallback_search(query)
@@ -100,7 +107,7 @@ def notmuch_count(query: str) -> int:
     if cfg.notmuch_enabled and notmuch_available():
         try:
             res = subprocess.run(
-                [cfg.notmuch_command, "count", query],
+                [cfg.notmuch_command, "count", query, "and", "not", "folder:trash"],
                 capture_output=True,
                 text=True,
                 timeout=10,
