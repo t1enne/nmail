@@ -27,6 +27,6 @@ MAILDIR_SUBFOLDERS: Final = ("new", "cur", "tmp")
 # ── Defaults ─────────────────────────────────────────────────────────────────
 DEFAULT_TEMPLATE: Final = "default"
 DEFAULT_PAGER: Final = "less"
-DEFAULT_SMTP_CMD: Final = "msmtp"
+DEFAULT_SMTP_CMD: Final = "msmtp -t"
 DEFAULT_SYNC_TOOL: Final = "mbsync"
 DEFAULT_SYNC_INTERVAL: Final = 300
