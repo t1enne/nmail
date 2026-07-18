@@ -124,6 +124,7 @@ def _summary_line(path: Path) -> str:
         raw = path.read_text(errors="replace")
     except Exception:
         return f"{path.name}: (unreadable)"
+    id = path.stem
     m = _DATE_RE.search(raw)
     date = m.group(1).strip() if m else ""
     m = _FROM_RE.search(raw)
@@ -135,7 +136,7 @@ def _summary_line(path: Path) -> str:
     # shorten long subjects
     if len(subj) > 72:
         subj = subj[:69] + "..."
-    return f"{date_short:12s}  {fro:<30.30s}  {subj}"
+    return f"{id:10s}  {date_short:12s}  {fro:<30.30s}  {subj}"
 
 
 def _truncate_date(raw: str) -> str:
