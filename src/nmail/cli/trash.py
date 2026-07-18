@@ -8,7 +8,7 @@ import click
 
 from ..config import get_config
 from ..logging import log_event
-from ..maildir import maildir_count, maildir_transfer
+from ..maildir import add_flag, maildir_count, maildir_transfer
 from ..shared import _resolve_ids
 
 
@@ -40,8 +40,10 @@ def trash(empty: bool, age: int | None, force: bool, ids: tuple[str, ...]) -> No
             raise click.UsageError("trash requires message IDs, --empty, or --age")
         files = _resolve_ids(ids)
         for f in files:
+            f = add_flag(f, "trashed")
             maildir_transfer(f, "trash")
-            click.echo(f"Trashed: {f.name}")
+
+        click.echo(f"Trashed {str(len(files))} mails")
         log_event("mail:trash", str(len(files)))
 
 
