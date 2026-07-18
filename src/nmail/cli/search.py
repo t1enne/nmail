@@ -99,7 +99,7 @@ def _search_interactive(query: str) -> None:
     try:
         preview_script = (
             f"fzf --multi --delimiter='\\t' --with-nth=2.. "
-            f"--preview 'cat {preview_dir}/$(basename {{1}}).md' < {tmp}"
+            f"--preview 'bat -l markdown --color=always {preview_dir}/$(basename {{1}}).md' < {tmp}"
         )
         proc = subprocess.run(
             ["sh", "-c", preview_script],
