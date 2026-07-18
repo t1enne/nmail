@@ -57,8 +57,10 @@ def reply(reply_all: bool, tmpl: str, no_quote: bool, id: str) -> None:
     if not subject.lower().startswith("re:"):
         subject = f"Re: {subject}"
 
-    draft_path = create_draft(tmpl, to=to, subject=subject)
+    cc_value = orig_cc if reply_all else ""
+    draft_path = create_draft(tmpl, to=to, cc=cc_value, subject=subject)
     content = draft_path.read_text()
+    content = _set_header(content, "From", my_addr)
     content = _set_header(content, "In-Reply-To", orig_msgid)
     content = _set_header(content, "References", refs)
     if not no_quote:
