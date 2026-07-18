@@ -42,16 +42,22 @@ def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
         click.echo(f"nmail sync: sync tool not found: {sync_tool}", err=True)
         raise SystemExit(1)
 
-    cmd = [sync_tool] + ([account] if account else [])
-    if dry_run:
-        click.echo(f"Would run: {' '.join(cmd)}")
-    else:
-        try:
-            subprocess.run(cmd, timeout=300)
-        except subprocess.TimeoutExpired:
-            log_event("mail:error", "sync timeout")
-            click.echo("Sync timed out", err=True)
-            raise SystemExit(1) from None
+    accounts = [account] if account else cfg.sync_accounts
+    if not accounts:
+        click.echo("nmail sync: no accounts configured. Set sync.accounts in config.toml or use --account", err=True)
+        raise SystemExit(1)
+
+    for acct in accounts:
+        cmd = [sync_tool, acct]
+        if dry_run:
+            click.echo(f"Would run: {' '.join(cmd)}")
+        else:
+            try:
+                subprocess.run(cmd, timeout=300)
+            except subprocess.TimeoutExpired:
+                log_event("mail:error", f"sync timeout: {acct}")
+                click.echo(f"Sync timed out: {acct}", err=True)
+                raise SystemExit(1) from None
 
     after = maildir_count("incoming")
     new_msgs = after - before
