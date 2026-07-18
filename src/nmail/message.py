@@ -47,15 +47,29 @@ def render_mail(path: Path) -> str:
     return "\n".join(lines)
 
 
+def _looks_like_html(text: str) -> bool:
+    """Heuristic: does this text/plain body actually contain HTML or CSS?"""
+    if re.search(r"<(?:html|head|style|script|body|div|br|p\b|a\s)", text, re.IGNORECASE):
+        return True
+    # CSS fragments like "a {text-decoration: none}" or "{font-family:...}"
+    if re.search(r"[{]\s*(?:margin|padding|font-|text-|color|background|display|border|width|height|mso-)", text, re.IGNORECASE):
+        return True
+    return False
+
+
 def _extract_body(msg) -> str:
     """Extract readable body, preferring text/plain over text/html."""
     if msg.is_multipart():
         parts = _walk_parts(msg)
         for ct, payload in parts:
-            if ct == "text/plain":
+            if ct == "text/plain" and not _looks_like_html(payload):
                 return payload
         for ct, payload in parts:
             if ct == "text/html":
+                return _strip_html(payload)
+        # Fallback: first text/plain even if it looks like HTML — strip it
+        for ct, payload in parts:
+            if ct == "text/plain":
                 return _strip_html(payload)
         if parts:
             return parts[0][1]
@@ -64,6 +78,8 @@ def _extract_body(msg) -> str:
     ct = msg.get_content_type()
     payload = _get_decoded_payload(msg)
     if ct == "text/html":
+        return _strip_html(payload)
+    if ct == "text/plain" and _looks_like_html(payload):
         return _strip_html(payload)
     return payload
 
@@ -100,10 +116,20 @@ def _get_decoded_payload(part) -> str:
 def _strip_html(text: str) -> str:
     """Strip HTML tags to plain text."""
     text = html.unescape(text)
+    # Remove <style> and <script> blocks entirely (contents are CSS/JS, not text)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    # Remove HTML comments
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    # Block-level → newlines
     text = re.sub(r"<(?:br|p|div|/p|/div)[^>]*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<li[^>]*>", "\n  • ", text, flags=re.IGNORECASE)
     text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
+    # Strip style attributes (handle tags with embedded > like <%...%> links)
+    text = re.sub(r'\s*style\s*=\s*"[^"]*"', "", text, flags=re.IGNORECASE)
+    # Strip all remaining tags
     text = re.sub(r"<[^>]+>", "", text)
+    # Collapse whitespace
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
     text = re.sub(r"^\s+", "", text, flags=re.MULTILINE)
     return text.strip()
