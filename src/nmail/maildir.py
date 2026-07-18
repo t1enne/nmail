@@ -34,8 +34,9 @@ def maildir_move(src: Path, dst_dir: str) -> Path:
     """Move file into a Maildir directory atomically (via tmp→new)."""
     cfg = get_config()
     target = cfg.maildir / dst_dir
-    target.mkdir(parents=True, exist_ok=True)
-    dest = target / "new" / src.name
+    dest_dir = target / "new"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
     # rename is atomic on same filesystem
     os.rename(src, dest)
     return dest
@@ -101,6 +102,7 @@ def mark_read(path: Path) -> Path:
         cur_dir = cfg.maildir / subdir / "cur"
         try:
             if path.relative_to(new_dir):
+                cur_dir.mkdir(parents=True, exist_ok=True)
                 dest = cur_dir / path.name
                 os.rename(path, dest)
                 return add_flag(dest, "seen")
