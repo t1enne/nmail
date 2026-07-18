@@ -35,7 +35,27 @@ from .shared import _open_editor, _resolve_ids
 @click.argument("operation", type=click.Choice(["list", "show", "edit", "create", "delete"]))
 @click.argument("name", required=False)
 def template(operation: str, name: str | None) -> None:
-    """Manage compose templates."""
+    """Manage draft templates.
+
+    Templates in ~/Mail/templates/ are starting points for
+    new drafts. Built-in: default, reply, forward.
+
+    Examples:
+
+    nmail template list
+
+    nmail template show default
+
+    nmail template create meeting
+
+    nmail template edit reply
+
+    nmail template delete obsolete
+
+    Create from stdin:
+
+    cat template.md | nmail template create my-template
+    """
     cfg = get_config()
     tmpl_dir = cfg.templates_dir
     tmpl_dir.mkdir(parents=True, exist_ok=True)
@@ -106,7 +126,21 @@ def _not_found(thing: str, name: str) -> None:
 @click.argument("operation", type=click.Choice(["list", "save", "open", "clean"]))
 @click.argument("args", nargs=-1)
 def attach(operation: str, args: tuple[str, ...]) -> None:
-    """Manage attachments."""
+    """Manage saved attachments.
+
+    Attachments stored in ~/Mail/attachments/. List, save
+    to current directory, open, or clean.
+
+    Examples:
+
+    nmail attach list
+
+    nmail attach save *.pdf  # copy to cwd
+
+    nmail attach open invoice.pdf
+
+    nmail attach clean  # remove all
+    """
     cfg = get_config()
     attach_dir = cfg.maildir / "attachments"
     attach_dir.mkdir(parents=True, exist_ok=True)
@@ -145,7 +179,20 @@ def attach(operation: str, args: tuple[str, ...]) -> None:
 @click.command()
 @click.argument("ids", nargs=-1)
 def archive(ids: tuple[str, ...]) -> None:
-    """Move message(s) to archive."""
+    """Move messages to archive.
+
+    Moves from incoming/ to archive/cur/.
+
+    Examples:
+
+    nmail archive 182 193
+
+    Pipe from search:
+
+    nmail search --format ids tag:todo | nmail archive -
+
+    nmail search --format ids from:newsletter | nmail archive -
+    """
     if not ids:
         raise click.UsageError("archive requires at least one message ID")
     files = _resolve_ids(ids)
@@ -165,7 +212,23 @@ def archive(ids: tuple[str, ...]) -> None:
 @click.option("--format", "fmt", type=click.Choice(["tsv", "json"]), default="tsv")
 @click.argument("query", required=False)
 def contacts(update: bool, fmt: str, query: str | None) -> None:
-    """Search and manage contacts."""
+    """Search and manage contacts.
+
+    Builds contact database from email headers (From, To, Cc).
+    Cache at ~/.local/state/nmail/contacts.tsv.
+
+    Examples:
+
+    nmail contacts --update  # rebuild from all mail
+
+    nmail contacts alice  # search
+
+    nmail contacts --format json
+
+    Interactive picker:
+
+    nmail contacts | fzf | cut -f2 | xargs nmail compose --to
+    """
     state_dir = Path.home() / ".local" / "state" / "nmail"
     state_dir.mkdir(parents=True, exist_ok=True)
     contacts_file = state_dir / "contacts.tsv"
@@ -230,7 +293,27 @@ def _read_contacts(path: Path) -> list[tuple[str, str, int]]:
 @click.argument("operation")
 @click.argument("ids", nargs=-1)
 def tag(operation: str, ids: tuple[str, ...]) -> None:
-    """Add or remove notmuch tags. OPERATION must start with + (add) or - (remove)."""
+    """Add or remove notmuch tags.
+
+    Operation must start with + (add) or - (remove).
+    Reads IDs from stdin when - is given as ID.
+
+    Requires notmuch.
+
+    Examples:
+
+    nmail tag +todo 182
+
+    nmail tag -unread 182  # mark as read
+
+    nmail tag +work 182 193 204
+
+    Pipe from search:
+
+    nmail search --format ids from:bob | nmail tag +bob -
+
+    nmail search --format ids subject:report | nmail tag +report -
+    """
     if not operation.startswith(("+", "-")):
         raise click.UsageError("Operation must start with + or -")
     if not ids:
@@ -261,7 +344,23 @@ def tag(operation: str, ids: tuple[str, ...]) -> None:
 @click.option("--force", is_flag=True)
 @click.argument("ids", nargs=-1)
 def trash(empty: bool, age: int | None, force: bool, ids: tuple[str, ...]) -> None:
-    """Move messages to trash or empty trash."""
+    """Move messages to trash or manage trash.
+
+    Three modes: move IDs to trash, empty trash entirely,
+    or purge trash older than N days.
+
+    Examples:
+
+    nmail trash 182 193  # move to trash
+
+    nmail trash --empty
+
+    nmail trash --empty --force  # skip confirm
+
+    nmail trash --age 30  # remove old trash
+
+    nmail search --format ids subject:spam | nmail trash -
+    """
     if empty:
         _empty_trash(force)
     elif age is not None:
@@ -332,7 +431,23 @@ def _purge_trash_by_age(days: int, force: bool) -> None:
 @click.option("--no-watch", is_flag=True)
 @click.option("--layout", default=None)
 def session(no_sync: bool, no_watch: bool, layout: str | None) -> None:
-    """Launch nmail tmux workspace."""
+    """Launch the nmail tmux workspace.
+
+    Creates (or re-attaches to) a tmux session. Grid layout:
+    top: status + search  bottom: watcher (if enabled)
+
+    Requires tmux.
+
+    Examples:
+
+    nmail session  # launch or attach
+
+    nmail session --no-sync
+
+    nmail session --no-watch
+
+    nmail session --layout windows
+    """
     cfg = get_config()
     tmux_cmd = cfg.tmux_command or "tmux"
     if not shutil.which(tmux_cmd):
@@ -420,7 +535,19 @@ def _setup_window(tmux_cmd: str, session: str, no_watch: bool) -> None:
 @click.argument("event")
 @click.argument("args", nargs=-1)
 def hook(event: str, args: tuple[str, ...]) -> None:
-    """Manually trigger hook scripts."""
+    """Manually trigger a hook event.
+
+    Fires matching scripts in ~/.config/nmail/hooks.d/.
+    Prefixed with 'mail:' if not already.
+
+    Examples:
+
+    nmail hook new 3  # simulate 3 new messages
+
+    nmail hook sent queue-abc123
+
+    nmail hook error queue-abc123 "SMTP timeout"
+    """
     if not event.startswith("mail:"):
         event = f"mail:{event}"
     log_event(event, *args)
@@ -435,7 +562,19 @@ def hook(event: str, args: tuple[str, ...]) -> None:
 @click.option("--once", is_flag=True)
 @click.option("--no-hooks", is_flag=True)
 def watch(once: bool, no_hooks: bool) -> None:
-    """Watch Maildir for changes and fire events."""
+    """Watch Maildir for new mail and fire events.
+
+    Monitors incoming/new/. Uses inotifywait if available,
+    falls back to polling every 5 seconds.
+
+    Examples:
+
+    nmail watch  # run continuously
+
+    nmail watch --once  # check and exit
+
+    nmail watch --no-hooks
+    """
     cfg = get_config()
     maildir = cfg.maildir
 
@@ -517,7 +656,26 @@ def _inotify_watch(maildir: Path, no_hooks: bool) -> None:
 def log_cmd(
     follow: bool, since: str | None, level: str | None, event_filter: str | None, as_json: bool
 ) -> None:
-    """Query the activity log."""
+    """View the activity log.
+
+    nmail logs events as JSON lines to ~/Mail/logs/nmail.log.
+
+    Examples:
+
+    nmail log --follow  # tail -f
+
+    nmail log --event mail:send
+
+    nmail log --level error
+
+    nmail log --since 2026-07-13
+
+    Combine filters:
+
+    nmail log --since 1h --level error
+
+    nmail log --json | jq
+    """
     cfg = get_config()
     log_file = cfg.logging_dir / "nmail.log"
 

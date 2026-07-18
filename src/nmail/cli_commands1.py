@@ -38,7 +38,29 @@ from .shared import _all_maildir_files, _open_editor, _set_header
 @click.option("--limit", "-n", type=int, default=50)
 @click.argument("query", required=False)
 def search(interactive: bool, fmt: str, limit: int, query: str | None) -> None:
-    """Search mail index."""
+    """Search your mail.
+
+    Uses notmuch for tagged/full-text search.
+    Without notmuch, lists maildir files.
+
+    Search syntax examples:
+
+    nmail search tag:unread
+
+    nmail search from:alice
+
+    nmail search subject:invoice
+
+    nmail search 'tag:unread from:alice'  # combined
+
+    Output options:
+
+    nmail search --interactive  # browse with fzf
+
+    nmail search --format ids tag:todo   # IDs for piping
+
+    nmail search --limit 20 from:bob
+    """
     if interactive:
         _search_interactive(query or "")
     else:
@@ -81,7 +103,25 @@ def _search_noninteractive(query: str, fmt: str, limit: int) -> None:
 @click.option("--no-quote", is_flag=True)
 @click.argument("id")
 def reply(reply_all: bool, tmpl: str, no_quote: bool, id: str) -> None:
-    """Create a reply draft from an existing message."""
+    """Reply to a message.
+
+    Opens editor with headers and quoted original pre-filled.
+    On save, the draft is validated and queued for sending.
+
+    Examples:
+
+    nmail reply 182  # reply to message 182
+
+    nmail reply --all 182  # reply to all recipients
+
+    nmail reply --no-quote 182
+
+    nmail reply --template quick 182
+
+    Pipe from search:
+
+    nmail search tag:unread | head -1 | xargs nmail reply
+    """
     path = resolve_id(id)
     if not path:
         click.echo(f"nmail reply: message not found: {id}", err=True)
@@ -170,7 +210,27 @@ def compose(
     from_stdin: bool,
     draft_arg: str | None,
 ) -> None:
-    """Create or edit a mail draft."""
+    """Compose a new message.
+
+    Opens $EDITOR on a Markdown draft. Headers in RFC822 style above
+    "---" line. Body is Markdown. On save, validates and queues.
+
+    Examples:
+
+    nmail compose   # interactive, opens editor
+
+    nmail compose --to alice@example.com
+
+    nmail compose --to alice --subject "Meeting"
+
+    nmail compose --no-send  # keep as draft only
+
+    nmail compose meeting  # start from 'meeting' template
+
+    Non-interactive from stdin:
+
+    echo -e "To: a@b\\nSubject: hi\\n---\\n\\nHello" | nmail compose --stdin
+    """
     ensure_maildir()
     if draft_arg and Path(draft_arg).exists():
         draft_path = Path(draft_arg)
@@ -204,7 +264,23 @@ def compose(
 @click.option("--retry", type=int, default=1)
 @click.option("--all", "send_all", is_flag=True)
 def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
-    """Drain the outbound queue through SMTP."""
+    """Send queued messages via SMTP.
+
+    Drains queue/new/ through msmtp (or configured SMTP command).
+    Successful sends move to sent/, failures stay in queue/cur/.
+
+    Examples:
+
+    nmail send  # send all pending
+
+    nmail send --dry-run  # preview without sending
+
+    nmail send --retry 3  # retry up to 3 times
+
+    nmail send --id queue-abc123  # send specific message
+
+    nmail send --all  # include previously failed
+    """
     cfg = get_config()
     queue_dir = cfg.maildir / "queue"
     to_send: list[Path] = []
@@ -271,7 +347,21 @@ def _move_to_queue_cur(path: Path) -> None:
 @click.option("--template", "tmpl", default="forward")
 @click.argument("id")
 def forward(tmpl: str, id: str) -> None:
-    """Create a forward draft."""
+    """Forward a message.
+
+    Creates a new draft with the original message quoted as
+    a forwarded block.
+
+    Examples:
+
+    nmail forward 182
+
+    nmail forward --template simple 182
+
+    Pipe from search:
+
+    nmail search subject:report | head -1 | xargs nmail forward
+    """
     path = resolve_id(id)
     if not path:
         click.echo(f"nmail forward: message not found: {id}", err=True)
@@ -305,7 +395,21 @@ def forward(tmpl: str, id: str) -> None:
 @click.option("--raw", "raw_mode", is_flag=True)
 @click.argument("id")
 def open_cmd(headers_only: bool, raw_mode: bool, id: str) -> None:
-    """Open a mail message in pager."""
+    """Open a message in your pager.
+
+    Resolves ID via notmuch or file listing. Marks as read
+    (moves new/ to cur/). Uses bat if available.
+
+    Examples:
+
+    nmail open 182  # by ID
+
+    nmail open ~/Mail/incoming/new/...  # by path
+
+    nmail open --headers-only 182
+
+    nmail open --raw 182
+    """
     path = resolve_id(id)
     if not path:
         click.echo(f"nmail open: message not found: {id}", err=True)
@@ -328,7 +432,23 @@ def open_cmd(headers_only: bool, raw_mode: bool, id: str) -> None:
 @click.option("--dry-run", is_flag=True)
 @click.option("--no-index", is_flag=True)
 def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
-    """Synchronize Maildir with remote IMAP."""
+    """Sync mail from IMAP.
+
+    Runs mbsync (or configured sync tool) to fetch new mail.
+    Optionally re-indexes with notmuch.
+
+    Requires mbsync configured in ~/.mbsyncrc.
+
+    Examples:
+
+    nmail sync  # sync all accounts
+
+    nmail sync --account work  # sync specific account
+
+    nmail sync --dry-run
+
+    nmail sync --no-index  # skip notmuch re-index
+    """
     cfg = get_config()
     ensure_maildir()
     log_event("mail:sync-start")
@@ -366,7 +486,19 @@ def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
 @click.option("--json", "as_json", is_flag=True)
 @click.option("--watch", "watch_mode", is_flag=True)
 def status(as_json: bool, watch_mode: bool) -> None:
-    """Show mailbox status overview."""
+    """Show mailbox statistics.
+
+    Displays counts for incoming, archive, sent, drafts,
+    queue, and trash directories.
+
+    Examples:
+
+    nmail status  # plain text overview
+
+    nmail status --json  # machine-readable
+
+    nmail status --watch  # live-refresh mode
+    """
     if watch_mode:
         while True:
             click.clear()
@@ -392,5 +524,25 @@ def _status_print(as_json: bool) -> None:
 @click.option("--format", "fmt", type=click.Choice(["plain", "mime", "html"]), default="mime")
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 def render_cmd(fmt: str, file: Path) -> None:
-    """Convert Markdown draft to RFC5322 MIME."""
+    """Render a draft to RFC5322 MIME format.
+
+    Converts Markdown draft with RFC822 headers to
+    a proper MIME message on stdout.
+
+    Examples:
+
+    nmail render draft.md  # default: multipart/alternative
+
+    nmail render --format plain draft.md  # text/plain only
+
+    nmail render --format html draft.md  # text/html only
+
+    nmail render queue/new/msg123
+
+    Pipe to other tools:
+
+    nmail render draft.md | bat --language=email
+
+    nmail render draft.md | aspell list  # check spelling
+    """
     click.echo(render_message(file, fmt))
