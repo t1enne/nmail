@@ -4,29 +4,25 @@ from __future__ import annotations
 
 import click
 
-from .cli_commands1 import (
-    compose,
-    forward,
-    open_cmd,
-    render_cmd,
-    reply,
-    search,
-    send,
-    status,
-    sync,
-)
-from .cli_commands2 import (
-    archive,
-    attach,
-    contacts,
-    hook,
-    log_cmd,
-    session,
-    tag,
-    template,
-    trash,
-    watch,
-)
+from .archive import archive
+from .attach import attach
+from .compose import compose
+from .contacts import contacts
+from .forward import forward
+from .hook import hook
+from .log import log_cmd
+from .open import open_cmd
+from .render import render_cmd
+from .reply import reply
+from .search import search
+from .send import send
+from .session import session
+from .status import status
+from .sync import sync
+from .tag import tag
+from .template import template
+from .trash import trash
+from .watch import watch
 
 
 @click.group()
