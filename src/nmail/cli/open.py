@@ -41,8 +41,7 @@ def open_cmd(headers_only: bool, raw_mode: bool, ids: tuple[str, ...]) -> None:
         raise SystemExit(1)
     if len(paths) > 1:
         click.echo(f"nmail open: multiple messages ({len(paths)}), opening first", err=True)
-    path = paths[0]
-    mark_read(path)
+    path = mark_read(paths[0])
     if raw_mode:
         click.echo(path.read_text(errors="replace"))
     elif headers_only:
