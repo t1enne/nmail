@@ -1,28 +1,27 @@
-# nmail — Unix-style terminal mail environment
+# nmail — terminal-first mail client
 
-> **Status:** Design complete. Phase 0 (MVP) implemented.
-> tmux is the orchestrator, not the mail client.
+> **Status:** Early development. Compose, render, send working.
+> All commands under single `nmail` binary.
 
 ## Philosophy
 
 nmail treats email as data (Maildir + Markdown), not as a GUI object.
-Every tool is a standalone Unix command. Compose with pipes. Tmux provides
-the workspace—nothing more.
+Compose with pipes. Every subcommand is a standalone action.
 
 ```
-mail-search tag:unread | fzf | xargs mail-open
-mail-search tag:todo | mail-archive -
-mail-contacts alice | fzf | xargs mail-compose --to
+nmail search --tag unread | fzf | xargs nmail open
+nmail search --tag todo | nmail archive -
+nmail contacts alice | fzf | xargs nmail compose --to
 ```
 
 ## Quick Start
 
 ```bash
 # Install
-./install.sh
+uv tool install .
 
-# Ensure ~/.local/bin is in PATH
-export PATH="$HOME/.local/bin:$PATH"
+# Or for development
+uv run nmail --help
 
 # Configure msmtp for SMTP
 $EDITOR ~/.msmtprc
@@ -31,63 +30,35 @@ $EDITOR ~/.msmtprc
 $EDITOR ~/.mbsyncrc
 
 # Sync mail
-mail-sync
+nmail sync
 
-# Launch workspace
-mail-session
+# Compose a draft
+nmail compose
 ```
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `mail-compose` | Create/edit draft, validate, queue |
-| `mail-render` | Markdown → RFC5322 MIME |
-| `mail-send` | Drain queue → SMTP (msmtp) |
-| `mail-sync` | Sync with IMAP (mbsync) |
-| `mail-watch` | Watch Maildir, fire events |
-| `mail-open` | Open message in pager |
-| `mail-reply` | Create reply draft |
-| `mail-forward` | Create forward draft |
-| `mail-search` | Search mail (notmuch or rg fallback) |
-| `mail-tag` | Add/remove notmuch tags |
-| `mail-archive` | Move to archive |
-| `mail-trash` | Move to trash / empty trash |
-| `mail-contacts` | Extract/query contacts |
-| `mail-template` | Manage draft templates |
-| `mail-status` | Mailbox statistics |
-| `mail-log` | Query activity log |
-| `mail-attach` | Manage attachments |
-| `mail-hook` | Trigger hook scripts |
-| `mail-session` | Launch tmux workspace |
-
-## Architecture
-
-```
-                    mail-session (tmux bootstrap)
-                           │
-          ┌────────────────┼────────────────┐
-          ▼                ▼                ▼
-    ┌──────────┐    ┌──────────┐    ┌──────────┐
-    │ compose  │    │ inbox    │    │ search   │
-    │ (nvim)   │    │ (lf)     │    │ (fzf)    │
-    └──────────┘    └──────────┘    └──────────┘
-          │                │                │
-          ▼                ▼                ▼
-    ┌────────────────────────────────────────────┐
-    │         STANDALONE UNIX COMMANDS           │
-    │   mail-compose, mail-render, mail-send,    │
-    │   mail-sync, mail-search, mail-open, ...   │
-    └────────────────────────────────────────────┘
-          │                │                │
-          ▼                ▼                ▼
-    ┌────────────────────────────────────────────┐
-    │              FILESYSTEM                    │
-    │              ~/Mail/                       │
-    │   incoming/ archive/ drafts/ sent/         │
-    │   trash/ queue/ attachments/ logs/         │
-    └────────────────────────────────────────────┘
-```
+| `nmail compose` | Create/edit draft |
+| `nmail render` | Markdown → RFC5322 MIME |
+| `nmail send` | Send queued mail via msmtp |
+| `nmail sync` | Sync Maildir via mbsync |
+| `nmail watch` | Watch Maildir, fire events |
+| `nmail open` | Open message in pager |
+| `nmail reply` | Create reply draft |
+| `nmail forward` | Create forward draft |
+| `nmail search` | Search mail (notmuch) |
+| `nmail tag` | Add/remove notmuch tags |
+| `nmail archive` | Move to archive |
+| `nmail trash` | Move to trash / empty trash |
+| `nmail contacts` | Extract/query contacts |
+| `nmail template` | Manage draft templates |
+| `nmail status` | Mailbox statistics |
+| `nmail log` | Query activity log |
+| `nmail attach` | Manage attachments |
+| `nmail hook` | Trigger hook scripts |
+| `nmail session` | Launch tmux workspace |
 
 ## Draft Format
 
@@ -120,9 +91,6 @@ John
     ├── on-new
     ├── on-sent
     └── on-error
-
-~/.local/bin/
-├── mail-compose         # and all other commands
 
 ~/Mail/
 ├── incoming/{cur,new,tmp}/
@@ -158,10 +126,23 @@ accounts = ["personal"]
 enabled = true
 ```
 
+## Development
+
+```bash
+# Install dev deps
+uv sync
+
+# Format, lint, typecheck
+make check
+
+# Run
+uv run nmail --help
+```
+
 ## Dependencies
 
-**Required:** bash, coreutils, tmux
-**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search), pandoc (HTML), nvim (editor), lf (file browser), fzf (picker), bat (pager), jq (JSON)
+**Required:** Python ≥3.11, click
+**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search), nvim (editor), lf (file browser), fzf (picker), bat (pager)
 **Optional:** ripgrep (search fallback), inotify-tools (watch), notify-send (notifications)
 
 ## Documentation
