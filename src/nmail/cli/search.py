@@ -89,12 +89,18 @@ def _search_interactive(query: str) -> None:
         click.echo("interactive mode requires a terminal", err=True)
         raise SystemExit(1) from None
 
+    # Tab-separated: path<TAB>summary. fzf splits on tab, preview uses {1} (path),
+    # display uses --with-nth=2.. (summary only).
     with tempfile.NamedTemporaryFile(mode="w", suffix=".nmail", delete=False) as f:
         for p in results:
-            f.write(p + "\n")
+            summary = _summary_line(Path(p))
+            f.write(f"{p}\t{summary}\n")
         tmp = f.name
     try:
-        preview_script = f"fzf --multi --preview 'cat {preview_dir}/$(basename {{}}).md' < {tmp}"
+        preview_script = (
+            f"fzf --multi --delimiter='\\t' --with-nth=2.. "
+            f"--preview 'cat {preview_dir}/$(basename {{1}}).md' < {tmp}"
+        )
         proc = subprocess.run(
             ["sh", "-c", preview_script],
             stdin=tty_fd,
@@ -104,7 +110,9 @@ def _search_interactive(query: str) -> None:
         if proc.returncode == 0:
             for line in proc.stdout.strip().splitlines():
                 if line:
-                    click.echo(Path(line).stem)
+                    # line is "path<TAB>summary" – extract path stem
+                    path_part = line.split("\t")[0]
+                    click.echo(Path(path_part).stem)
     finally:
         os.close(tty_fd)
         Path(tmp).unlink(missing_ok=True)
