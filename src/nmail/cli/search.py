@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import datetime
+import atexit
 import json
 import os
 import re
@@ -22,7 +22,10 @@ from ..shared import _all_maildir_files
 @click.command()
 @click.option("--interactive/--no-interactive", default=False)
 @click.option(
-    "--format", "fmt", type=click.Choice(["files", "ids", "json", "preview", "summary"]), default="summary"
+    "--format",
+    "fmt",
+    type=click.Choice(["files", "ids", "json", "preview", "summary"]),
+    default="summary",
 )
 @click.option("--limit", "-n", type=int, default=50)
 @click.argument("query", required=False)
@@ -75,6 +78,7 @@ def _search_interactive(query: str) -> None:
 
     preview_dir = Path(tempfile.gettempdir()) / f"nmail-previews-{uuid.uuid4().hex[:8]}"
     preview_dir.mkdir(exist_ok=True)
+    atexit.register(shutil.rmtree, preview_dir, ignore_errors=True)
     for p in results:
         key = Path(p).name
         (preview_dir / f"{key}.md").write_text(rendered[p])
@@ -83,7 +87,7 @@ def _search_interactive(query: str) -> None:
         tty_fd = os.open("/dev/tty", os.O_RDONLY)
     except OSError:
         click.echo("interactive mode requires a terminal", err=True)
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".nmail", delete=False) as f:
         for p in results:
@@ -136,11 +140,17 @@ def _summary_line(path: Path) -> str:
 
 def _truncate_date(raw: str) -> str:
     """Take a date string, return a short friendly form."""
-    import datetime as dt
-    for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z",
-                "%d %b %Y %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S%z",
-                "%Y-%m-%d %H:%M:%S %z", "%a, %d %b %Y"):
+    for fmt in (
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M:%S %Z",
+        "%d %b %Y %H:%M:%S %z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%d %H:%M:%S %z",
+        "%a, %d %b %Y",
+    ):
         try:
+            import datetime
+
             parsed = datetime.datetime.strptime(raw.strip(), fmt)
             return parsed.strftime("%b %d")
         except ValueError:

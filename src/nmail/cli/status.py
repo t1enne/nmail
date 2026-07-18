@@ -8,7 +8,7 @@ import time
 import click
 
 from ..maildir import MAILDIR_SUBDIRS, maildir_list_new, maildir_total
-from ..notmuch import notmuch_count, notmuch_available
+from ..notmuch import notmuch_available, notmuch_count
 
 
 @click.command()

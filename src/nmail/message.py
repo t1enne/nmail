@@ -50,14 +50,16 @@ def render_mail(path: Path) -> str:
     return "\n".join(lines)
 
 
+_CSS_PROP_RE = re.compile(
+    r"[{]\s*(?:margin|padding|font-|text-|color|background|display|border|width|height|mso-)",
+    re.IGNORECASE,
+)
+_HTML_TAG_RE = re.compile(r"<(?:html|head|style|script|body|div|br|p\b|a\s)", re.IGNORECASE)
+
+
 def _looks_like_html(text: str) -> bool:
     """Heuristic: does this text/plain body actually contain HTML or CSS?"""
-    if re.search(r"<(?:html|head|style|script|body|div|br|p\b|a\s)", text, re.IGNORECASE):
-        return True
-    # CSS fragments like "a {text-decoration: none}" or "{font-family:...}"
-    if re.search(r"[{]\s*(?:margin|padding|font-|text-|color|background|display|border|width|height|mso-)", text, re.IGNORECASE):
-        return True
-    return False
+    return bool(_HTML_TAG_RE.search(text) or _CSS_PROP_RE.search(text))
 
 
 def _extract_body(msg) -> str:

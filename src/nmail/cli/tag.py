@@ -50,7 +50,9 @@ def tag(operation: str, ids: tuple[str, ...]) -> None:
             try:
                 r = subprocess.run(
                     [cfg.notmuch_command, "search", "--output=files", f"id:{rid}"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 if not r.stdout.strip():
                     click.echo(f"ID not found: {rid}", err=True)

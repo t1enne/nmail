@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ from pathlib import Path
 
 from .config import get_config
 from .maildir import MAILDIR_SUBDIRS
+
+logger = logging.getLogger(__name__)
 
 
 def _cmd(notmuch_cmd: str, *args: str) -> list[str]:
@@ -26,7 +29,7 @@ def notmuch_available() -> bool:
             timeout=5,
         )
         return True
-    except Exception:
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return False
 
 
@@ -46,7 +49,7 @@ def _rg_search(query: str) -> list[str]:
                     timeout=30,
                 )
                 files.extend(res.stdout.strip().splitlines())
-            except Exception:
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
                 pass
     return files
 
@@ -65,7 +68,7 @@ def _grep_search(query: str) -> list[str]:
                     timeout=30,
                 )
                 files.extend(res.stdout.strip().splitlines())
-            except Exception:
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
                 pass
     return files
 
@@ -100,8 +103,8 @@ def notmuch_search(query: str, output: str = "files") -> list[str]:
             # Skip stale index entries (file was deleted since last notmuch new)
             results = [r for r in results if Path(r).is_file()]
             return results
-        except Exception:
-            pass
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.warning("notmuch search failed, falling back to grep: %s", e)
     return _fallback_search(query)
 
 
@@ -116,8 +119,8 @@ def notmuch_count(query: str) -> int:
                 timeout=10,
             )
             return int(res.stdout.strip() or 0)
-        except Exception:
-            pass
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError, ValueError) as e:
+            logger.warning("notmuch count failed, falling back to grep: %s", e)
     return len(_fallback_search(query))
 
 
@@ -158,7 +161,7 @@ def _resolve_via_notmuch(id_str: str) -> Path | None:
         lines = [line for line in res.stdout.strip().splitlines() if line]
         if lines:
             return Path(lines[0])
-    except Exception:
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
     return None
 

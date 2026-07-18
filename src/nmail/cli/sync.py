@@ -44,7 +44,10 @@ def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
 
     accounts = [account] if account else cfg.sync_accounts
     if not accounts:
-        click.echo("nmail sync: no accounts configured. Set sync.accounts in config.toml or use --account", err=True)
+        click.echo(
+            "nmail sync: no accounts configured. Set sync.accounts in config.toml or use --account",
+            err=True,
+        )
         raise SystemExit(1)
 
     for acct in accounts:

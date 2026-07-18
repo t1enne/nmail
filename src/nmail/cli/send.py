@@ -79,7 +79,7 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
                     break
                 if attempt < retry - 1:
                     time.sleep(2)
-            except (subprocess.TimeoutExpired, Exception):
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
                 if attempt < retry - 1:
                     time.sleep(2)
         if not ok:

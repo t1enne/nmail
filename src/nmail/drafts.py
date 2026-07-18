@@ -42,7 +42,7 @@ def create_draft(
     if bcc:
         content = _set_header(content, "Bcc", bcc)
 
-    draft_path.write_text(content)
+    _atomic_write(draft_path, content)
     return draft_path
 
 
@@ -62,6 +62,14 @@ def _set_header(content: str, header: str, value: str) -> str:
         insert_at = i + 1
     lines.insert(insert_at, f"{header}: {value}")
     return "\n".join(lines)
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content atomically via tmpfile + rename to avoid corruption on crash."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(content)
+    # shutil.move on same filesystem is os.rename → atomic
+    shutil.move(str(tmp), str(path))
 
 
 def validate_draft(path: Path) -> bool:

@@ -101,7 +101,7 @@ def render_message(path: Path, fmt: str = "mime") -> str:
     headers_dict = _parse_headers_block(draft.headers)
 
     msg = email.message.EmailMessage()
-    msg.policy = email.policy.compat32
+    msg.policy = email.policy.default
 
     # Transfer known headers
     for hdr in (
