@@ -2,14 +2,33 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
+from pathlib import Path
 
 import click
 
 from ..config import get_config
+from ..headers import extract_header
 from ..logging import log_event
 from ..notmuch import notmuch_tag
+
+
+def _maildir_to_msgid(id_str: str) -> str | None:
+    """Convert a Maildir filename stem to a notmuch message-ID by extracting
+    the Message-ID header. Returns None if file can't be found/read."""
+    cfg = get_config()
+    for subdir in ("incoming", "archive", "sent"):
+        for mdir_sub in ("cur", "new", "tmp"):
+            d = cfg.maildir / subdir / mdir_sub
+            if not d.exists():
+                continue
+            for p in d.glob(f"{id_str}*"):
+                if not p.is_file():
+                    continue
+                mid = extract_header(p, "Message-ID")
+                if mid:
+                    return mid.strip("<>")
+    return None
 
 
 @click.command()
@@ -43,22 +62,15 @@ def tag(operation: str, ids: tuple[str, ...]) -> None:
         else:
             resolved.append(id_str)
 
-    # Warn on IDs that notmuch doesn't know about
     cfg = get_config()
-    if cfg.notmuch_enabled:
-        for rid in resolved:
-            try:
-                r = subprocess.run(
-                    [cfg.notmuch_command, "search", "--output=files", f"id:{rid}"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if not r.stdout.strip():
-                    click.echo(f"ID not found: {rid}", err=True)
-            except Exception:
-                pass
-
     for rid in resolved:
-        notmuch_tag(operation, rid)
+        if rid.startswith("id:") or "@" in rid:
+            notmuch_tag(operation, rid)
+        else:
+            msgid = _maildir_to_msgid(rid)
+            if msgid:
+                notmuch_tag(operation, f"id:{msgid}")
+            elif cfg.notmuch_enabled:
+                click.echo(f"ID not found: {rid}", err=True)
+
     log_event("mail:tag", operation, str(len(resolved)))
