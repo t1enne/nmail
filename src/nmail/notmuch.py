@@ -16,7 +16,9 @@ from .maildir import MAILDIR_SUBDIRS
 logger = logging.getLogger(__name__)
 
 # Notmuch prefixes that don't work in grep/rg fallback
-_NOTMUCH_PREFIXES = re.compile(r'\b(subject|from|to|tag|folder|path|id|thread|attachment|mimetype):', re.IGNORECASE)
+_NOTMUCH_PREFIXES = re.compile(
+    r"\b(subject|from|to|tag|folder|path|id|thread|attachment|mimetype):", re.IGNORECASE
+)
 
 
 def _cmd(notmuch_cmd: str, *args: str) -> list[str]:
@@ -80,7 +82,7 @@ def _grep_search(query: str) -> list[str]:
 def _fallback_search(query: str) -> list[str]:
     if _NOTMUCH_PREFIXES.search(query):
         logger.warning(
-            "Structured query '%s' contains notmuch prefixes (subject:, from:, tag:, folder:, etc.). "
+            "Structured query '%s' contains notmuch prefixes (subject:, from:, tag:, etc.). "
             "Fallback grep/rg uses literal text match — results may be incomplete or empty. "
             "Install notmuch for full structured search.",
             query,
