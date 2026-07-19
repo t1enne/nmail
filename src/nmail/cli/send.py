@@ -46,7 +46,8 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
     else:
         new_dir = queue_dir / "new"
         if new_dir.exists():
-            to_send.extend(sorted(new_dir.iterdir(), key=lambda x: x.stat().st_mtime))
+            all_msgs = sorted(new_dir.iterdir(), key=lambda x: x.stat().st_mtime)
+            to_send = all_msgs if send_all else all_msgs[:1]
     if not to_send:
         click.echo("No messages to send.")
         return
@@ -91,7 +92,6 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
 
 
 def _move_to_queue_cur(path: Path) -> None:
-    from ..config import get_config
 
     cur = get_config().maildir / "queue" / "cur"
     cur.mkdir(parents=True, exist_ok=True)
