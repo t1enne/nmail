@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import click
 
 from ..headers import extract_header
 from ..maildir import maildir_list_all
+from ..message import decode_rfc2047
 
 
 @click.command()
@@ -49,6 +51,21 @@ def contacts(update: bool, fmt: str, query: str | None) -> None:
             click.echo(f"{name:40}\t{email:40s}\t{count:2d}")
 
 
+def _normalize_id(name: str, email: str) -> str:
+    """Derive a clean, human-readable contact ID from name and email.
+
+    Decodes MIME-encoded words, strips quotes/special chars,
+    and produces a lowercase, underscore-separated identifier.
+    """
+    decoded = decode_rfc2047(name) if name else ""
+    if not decoded:
+        decoded = email.split("@")[0]
+    # Replace non-word chars with underscore, collapse, strip
+    normalized = re.sub(r"[^\w]+", "_", decoded).strip("_").lower()
+    normalized = re.sub(r"_+", "_", normalized)
+    return normalized or email.split("@")[0].lower()
+
+
 def _rebuild_contacts(path: Path) -> None:
     click.echo("Scanning mailbox for contacts...", err=True)
     counter: dict[tuple[str, str], int] = {}
@@ -69,7 +86,8 @@ def _rebuild_contacts(path: Path) -> None:
                         name = ""
                         email = addr
                     if email:
-                        key = (name or email.split("@")[0], email.lower())
+                        clean_id = _normalize_id(name, email)
+                        key = (clean_id, email.lower())
                         counter[key] = counter.get(key, 0) + 1
     with open(path, "w") as f:
         for (name, email), count in sorted(counter.items(), key=lambda x: -x[1]):
