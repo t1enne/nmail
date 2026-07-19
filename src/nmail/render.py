@@ -111,8 +111,10 @@ def _markdown_to_html(md: str) -> str:
                 cells = cells[:-1]
             cells = [c.strip() for c in cells]
             tag = "th" if i == 0 else "td"
-            rows.append(f"<tr>{"".join(f"<{tag}>{_inline(c)}</{tag}>" for c in cells)}</tr>")
-        out.append(f"<table>{"".join(rows)}</table>")
+            row_cells = "".join(f"<{tag}>{_inline(c)}</{tag}>" for c in cells)
+            rows.append(f"<tr>{row_cells}</tr>")
+        table_html = "".join(rows)
+        out.append(f"<table>{table_html}</table>")
         table_buf = []
 
     def _close_blockquote() -> None:
