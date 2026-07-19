@@ -1,4 +1,6 @@
-# nmail — terminal-first mail client
+# nmail — terminal-first mail toolkit
+
+nmail is a composable Unix mail toolkit that treats email as plain data, letting you search, compose, automate, and process mail with shell pipelines instead of living inside a terminal UI. Unlike monolithic clients (mutt, aerc, sup), nmail doesn't own your screen — it provides 16 standalone subcommands that each do one thing and output to stdout. Compose with your editor on Markdown files. Send asynchronously through a queue. Search with notmuch or ripgrep. Hook into every event with shell scripts. No daemon, no database, no lock-in — just Maildir and pipes.
 
 ## Philosophy
 
@@ -47,6 +49,8 @@ nmail compose
 nmail send
 ```
 
+> **Dependencies:** Python ≥3.11, click, tomli. Recommended: msmtp (SMTP), mbsync (IMAP), notmuch (search), bat (pager), fzf (browse).
+
 ### Composing Pipelines
 
 ```bash
@@ -69,26 +73,26 @@ nmail status
 
 ## Commands
 
-| Command          | Description                       |
-| ---------------- | --------------------------------- |
-| `nmail compose`  | Create/edit draft                 |
-| `nmail render`   | Markdown → RFC5322 MIME           |
-| `nmail send`     | Send queued mail via msmtp        |
-| `nmail sync`     | Sync Maildir via mbsync           |
-| `nmail watch`    | Watch Maildir, fire events        |
-| `nmail open`     | Open message in pager             |
-| `nmail reply`    | Create reply draft                |
-| `nmail forward`  | Create forward draft              |
-| `nmail search`   | Search mail (notmuch or ripgrep)  |
-| `nmail tag`      | Add/remove notmuch tags           |
-| `nmail archive`  | Move to archive                   |
-| `nmail trash`    | Move to trash / empty trash       |
-| `nmail contacts` | Extract/query contacts            |
-| `nmail template` | Manage draft templates            |
-| `nmail status`   | Mailbox statistics                |
-| `nmail log`      | Query activity log                |
-| `nmail attach`   | Manage saved attachments          |
-| `nmail hook`     | Trigger hook scripts              |
+| Command          | Description                      |
+| ---------------- | -------------------------------- |
+| `nmail compose`  | Create/edit draft                |
+| `nmail render`   | Markdown → RFC5322 MIME          |
+| `nmail send`     | Send queued mail via msmtp       |
+| `nmail sync`     | Sync Maildir via mbsync          |
+| `nmail watch`    | Watch Maildir, fire events       |
+| `nmail open`     | Open message in pager            |
+| `nmail reply`    | Create reply draft               |
+| `nmail forward`  | Create forward draft             |
+| `nmail search`   | Search mail (notmuch or ripgrep) |
+| `nmail tag`      | Add/remove notmuch tags          |
+| `nmail archive`  | Move to archive                  |
+| `nmail trash`    | Move to trash / empty trash      |
+| `nmail contacts` | Extract/query contacts           |
+| `nmail template` | Manage draft templates           |
+| `nmail status`   | Mailbox statistics               |
+| `nmail log`      | Query activity log               |
+| `nmail attach`   | Manage saved attachments         |
+| `nmail hook`     | Trigger hook scripts             |
 
 ## Search Syntax
 
@@ -238,9 +242,13 @@ uv run nmail --help
 
 ## Dependencies
 
-**Required:** Python ≥3.11, click≥8.1, tomli≥2.0
-**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search/index), bat (pager), fzf (interactive browse)
-**Optional:** ripgrep (search fallback when notmuch unavailable), inotify-tools (watch), notify-send (notifications)
+| Category        | Tools                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| **Required**    | Python ≥3.11, click≥8.1, tomli≥2.0, msmtp (or other SMTP command), mbsync (or other IMAP sync tool)  |
+| **Recommended** | notmuch (tagging, fast search, unread counts), bat (pager), fzf (interactive browse)                 |
+| **Optional**    | ripgrep (better grep fallback), inotify-tools (efficient watch), notify-send (desktop notifications) |
+
+msmtp and mbsync are practically mandatory — without SMTP you can't send, without IMAP sync you can't receive. The binary names are configurable (`smtp.command`, `sync.tool`) but the function isn't optional.
 
 ## Documentation
 

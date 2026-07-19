@@ -1,10 +1,12 @@
 ---
 name: nmail
-description: Terminal-first mail client — compose, search, reply, tag, and manage email via CLI. Use when the user needs to read email, compose messages, search mail, manage tags, reply/forward, sync IMAP, check mailbox status, watch for new mail, or manage templates/attachments.
+description: Terminal-first mail toolkit — compose, search, reply, tag, and manage email via CLI. Use when the user needs to read email, compose messages, search mail, manage tags, reply/forward, sync IMAP, check mailbox status, watch for new mail, or manage templates/attachments.
 allowed-tools: Bash(nmail:*)
 ---
 
 # nmail — Terminal Mail Client
+
+nmail is a composable Unix mail toolkit that treats email as plain data, letting you search, compose, automate, and process mail with shell pipelines instead of living inside a terminal UI. Unlike monolithic clients (mutt, aerc, sup), nmail doesn't own your screen — it provides standalone subcommands that each do one thing and output to stdout. Compose with your editor on Markdown files. Send asynchronously through a queue. Search with notmuch or ripgrep. Hook into every event with shell scripts. No daemon, no database, no lock-in — just Maildir and pipes.
 
 `nmail` is a Python CLI tool that treats email as data (Maildir + Markdown). Every subcommand is a standalone action — composable with pipes, fzf, and shell pipelines.
 
@@ -44,6 +46,7 @@ echo -e "To: a@b\nSubject: hi\n---\n\nHello" | nmail compose --stdin  # From std
 ```
 
 **Draft format** (Markdown with RFC822-style headers above `---` separator):
+
 ```
 From: john@example.com
 To: alice@example.com
@@ -107,6 +110,7 @@ nmail search --limit 20 from:bob
 **Output formats:** `summary` (default, date/from/subject table), `ids` (message IDs), `files` (full paths), `json`, `preview` (full rendered markdown-style)
 
 **Pipe pattern:**
+
 ```bash
 nmail search --format ids tag:unread | while read id; do nmail open "$id"; done
 nmail search --format ids tag:todo | nmail archive -
@@ -329,9 +333,14 @@ Key env overrides: `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFI
 
 ## Dependencies
 
-**Required:** Python ≥3.11, click≥8.1, tomli≥2.0
-**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search/index), bat (pager), fzf (interactive browse)
-**Optional:** ripgrep (search fallback when notmuch unavailable), inotify-tools (watch), notify-send (notifications)
+| Category        | Tools                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| **Required**    | Python ≥3.11, click≥8.1, tomli≥2.0, msmtp (or other SMTP command), mbsync (or other IMAP sync tool)  |
+| **Recommended** | notmuch (tagging, fast search, unread counts), bat (pager), fzf (interactive browse)                 |
+| **Optional**    | ripgrep (better grep fallback), inotify-tools (efficient watch), notify-send (desktop notifications) |
+
+msmtp and mbsync are practically mandatory — without SMTP you can't send, without IMAP sync you can't receive. The binary names are configurable (`smtp.command`, `sync.tool`) but the function isn't optional.
+
 **Install:** `uv tool install .` or `uv run nmail --help` for dev
 
 ## Composing Commands (Pipes & Patterns)
