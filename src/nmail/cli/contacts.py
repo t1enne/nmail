@@ -46,7 +46,7 @@ def contacts(update: bool, fmt: str, query: str | None) -> None:
         click.echo(json.dumps([{"name": n, "email": e, "count": c} for n, e, c in entries]))
     else:
         for name, email, count in entries:
-            click.echo(f"{name}\t{email}\t{count}")
+            click.echo(f"{name:40}\t{email:40s}\t{count:2d}")
 
 
 def _rebuild_contacts(path: Path) -> None:
