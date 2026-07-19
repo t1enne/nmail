@@ -41,7 +41,7 @@ nmail reply 182                       # Reply to message ID 182
 nmail send                            # Send next queued message
 nmail open 182                        # Open message in pager
 nmail status                          # Mailbox statistics
-nmail tag +todo 182                   # Add "todo" tag
+nmail tag -- +todo 182                # Add "todo" tag
 nmail archive 182                     # Archive message
 nmail trash 182                       # Trash message
 nmail contacts alice                  # Search contacts
@@ -134,7 +134,7 @@ nmail search --limit 20 from:bob
 ```bash
 nmail search --format ids tag:unread | while read id; do nmail open "$id"; done
 nmail search --format ids tag:todo | nmail archive -
-nmail search --format ids tag:unread | nmail tag +read -
+nmail search --format ids tag:unread | nmail tag -- +read -
 
 # Interactive selection → act on chosen messages
 nmail search --interactive tag:unread | while read id; do nmail open "$id"; done
@@ -171,10 +171,10 @@ Both validate on save → queue for sending.
 Add/remove notmuch tags. Requires notmuch.
 
 ```bash
-nmail tag +todo 182                  # Add tag (must start with +)
-nmail tag -unread 182                # Remove tag (must start with -)
-nmail tag +work 182 193 204          # Tag multiple messages
-nmail search --format ids from:bob | nmail tag +bob -   # Tag from pipe
+nmail tag -- +todo 182                  # Add tag (must start with +)
+nmail tag -- -unread 182                # Remove tag (must start with -)
+nmail tag -- +work 182 193 204          # Tag multiple messages
+nmail search --format ids from:bob | nmail tag -- +bob -   # Tag from pipe
 ```
 
 ### Archive / Trash
