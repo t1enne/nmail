@@ -16,7 +16,7 @@ nmail sync                            # Fetch mail via mbsync
 nmail search --interactive            # Browse mail with fzf preview
 nmail compose --to alice@example.com  # Compose new message
 nmail reply 182                       # Reply to message ID 182
-nmail send                            # Send queued messages
+nmail send                            # Send next queued message
 nmail open 182                        # Open message in pager
 nmail status                          # Mailbox statistics
 nmail tag +todo 182                   # Add "todo" tag
@@ -24,6 +24,8 @@ nmail archive 182                     # Archive message
 nmail trash 182                       # Trash message
 nmail contacts alice                  # Search contacts
 nmail watch                           # Watch for new mail
+nmail log --since 1h                  # Recent activity
+nmail hook new 3                      # Fire on-new hook for 3 messages
 ```
 
 ## Commands
@@ -102,13 +104,17 @@ nmail search --format preview tag:unread  # Rendered previews
 nmail search --limit 20 from:bob
 ```
 
-**Output formats:** `summary` (default, date/from/subject table), `ids` (message IDs), `files` (full paths), `json`, `preview` (full rendered)
+**Output formats:** `summary` (default, date/from/subject table), `ids` (message IDs), `files` (full paths), `json`, `preview` (full rendered markdown-style)
 
 **Pipe pattern:**
 ```bash
-nmail search --format ids tag:unread | xargs nmail open
+nmail search --format ids tag:unread | while read id; do nmail open "$id"; done
 nmail search --format ids tag:todo | nmail archive -
 nmail search --format ids tag:unread | nmail tag +read -
+
+# Interactive selection → act on chosen messages
+nmail search --interactive tag:unread | while read id; do nmail open "$id"; done
+nmail search --interactive tag:todo   | while read id; do nmail reply "$id"; done
 ```
 
 ### Open
@@ -118,7 +124,6 @@ Open message in pager (bat if available, otherwise configured pager).
 ```bash
 nmail open 182                       # Open by message ID
 nmail open ~/Mail/incoming/new/...   # Open by file path
-nmail open --headers-only 182        # Show headers only
 nmail open --raw 182                 # Show raw RFC5322 message
 ```
 
@@ -212,7 +217,7 @@ cat template.md | nmail template create my-template  # From stdin
 
 ### Attach
 
-Manage saved attachments in `~/Mail/attachments/`.
+Manage saved attachments in `~/Mail/attachments/`. Attachments are saved to this directory during compose with `--attach`, then available for listing, opening, or copying out.
 
 ```bash
 nmail attach list                    # List saved attachments
@@ -262,8 +267,8 @@ nmail render queue/new/msg123        # Render queued message
 
 ```
 ~/.config/nmail/
-└── config.toml          # Main configuration
-└── hooks.d/             # Event hooks (on-new, on-sent, on-error)
+├── config.toml          # Main configuration
+└── hooks.d/             # Event hook scripts (on-new, on-sent, on-error, etc.)
 
 ~/Mail/
 ├── incoming/{cur,new,tmp}/   # Inbox
@@ -274,18 +279,21 @@ nmail render queue/new/msg123        # Render queued message
 ├── queue/{cur,new,tmp}/      # Outgoing queue
 ├── templates/*.md            # Draft templates
 ├── attachments/              # Saved attachments
-└── logs/                     # Event logs (nmail.log)
+└── logs/
+    └── nmail.log             # JSON-line event log
 ```
 
 ## Configuration
 
 ```toml
 # ~/.config/nmail/config.toml
-[general]
+
+# Flat top-level keys (no [general] section)
 maildir = "~/Mail"
-editor = "nvim"
 pager = "bat --plain --language=email"
-from_address = "John Doe <john@example.com>"
+
+[user]
+from = "John Doe <john@example.com>"
 
 [smtp]
 command = "msmtp"
@@ -316,11 +324,59 @@ enabled = true
 events = ["mail:new", "mail:error"]
 ```
 
+Editor is read from `$EDITOR` or `$VISUAL` env vars (not config).
+Key env overrides: `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFIG_HOME`.
+
 ## Dependencies
 
 **Required:** Python ≥3.11, click≥8.1, tomli≥2.0
-**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search), nvim (editor), bat (pager), fzf (picker), lf (file browser), inotify-tools (watch), ripgrep (search fallback)
+**Recommended:** msmtp (SMTP), mbsync (IMAP), notmuch (search/index), bat (pager), fzf (interactive browse)
+**Optional:** ripgrep (search fallback when notmuch unavailable), inotify-tools (watch), notify-send (notifications)
 **Install:** `uv tool install .` or `uv run nmail --help` for dev
+
+## Composing Commands (Pipes & Patterns)
+
+nmail is built for composition. Every subcommand outputs plain text — pipe, filter, chain.
+
+```bash
+# Interactive browse → open or reply to selections (fzf multi-select)
+nmail search --interactive tag:unread | while read id; do nmail open "$id"; done
+nmail search --interactive tag:todo   | while read id; do nmail reply "$id"; done
+
+# Inbox triage: tag important senders, archive newsletters, trash spam
+nmail search --format ids tag:unread from:boss@company.com | nmail tag +important -
+nmail search --format ids tag:unread subject:'weekly digest' | nmail archive -
+nmail search --format ids subject:'viagra' | nmail trash -
+
+# Reply to all flagged messages in batch
+nmail search --format ids tag:flagged | while read id; do nmail reply "$id"; done
+
+# Daily digest: what's new, what's pending
+nmail search --format summary tag:unread --limit 10
+nmail status
+nmail log --since 1h --level error
+
+# Find and forward all attachments from a sender
+nmail search --format ids from:alice | while read id; do nmail forward "$id"; done
+
+# Interactive contact picker → compose
+nmail contacts | fzf --header='Pick recipient' | awk '{print $2}' | xargs nmail compose --to
+
+# Render draft, diff against sent version
+nmail render draft.md | diff - <(nmail open --raw 182)
+
+# Watch for new mail, fire desktop notifications (via hooks)
+nmail watch  # sits in background, fires on-new hook on new mail
+
+# Auto-tag script: tag messages by sender domain rules
+nmail search --format ids 'from:@company.com AND NOT tag:work' | nmail tag +work -
+
+# Failed sends? Retry
+nmail log --since 1h --event mail:error | grep -q . && nmail send --all
+
+# Export all archived mail to mbox
+find ~/Mail/archive/cur -type f | xargs cat > archive.mbox
+```
 
 ## Agent Usage Patterns
 
@@ -360,6 +416,7 @@ nmail status --json
 
 ```bash
 nmail search --format ids tag:unread | nmail archive -
+nmail search --format ids from:bob | nmail tag +bob -
 nmail tag +important 182
 nmail trash 182
 ```
@@ -378,4 +435,6 @@ nmail sync
 - Use `nmail status --json` for structured mailbox stats
 - Use `nmail open --raw` to get raw RFC5322 for programmatic parsing
 - Non-interactive commands exit 0 on success, 1 on error — check exit codes
-- Message IDs (like `182`) are partial-match — notmuch resolves them to full paths
+- Message IDs (like `182`) are partial-match: notmuch resolves them first, then Maildir glob fallback
+- Search falls back to ripgrep/grep automatically when notmuch is unavailable
+- `nmail compose --no-send` saves draft but skips queue; `nmail compose --queue` queues immediately after editor exit (default behavior)
