@@ -15,56 +15,56 @@ from nmail.cli.contacts import _normalize_id
     [
         # Quoted‑Printable (Q) encoding
         (
-            "=?UTF-8?Q?Guerra=2c_Ges=c3=b9?=",
-            "gesuguerra1990@gmail.com",
-            "guerra_gesù",
+            "=?UTF-8?Q?Rossi=2c_Mar=c3=b2?=",
+            "rossi.marco@example.com",
+            "rossi_marò",
         ),
         (
-            "=?utf-8?Q?Niccol=C3=B2_Benetollo?=",
-            "nicobenetollo@hotmail.it",
-            "niccolò_benetollo",
+            "=?utf-8?Q?Fran=C3=A7ois_Dupont?=",
+            "dupont.francois@example.com",
+            "françois_dupont",
         ),
         (
-            "=?UTF-8?Q?Nicol=c3=b2_Meschini?=",
-            "meschini.nico@gmail.com",
-            "nicolò_meschini",
+            "=?UTF-8?Q?Jos=c3=a9_Garc=c3=ada?=",
+            "garcia.jose@example.com",
+            "josé_garcía",
         ),
         (
-            "=?UTF-8?Q?Elisaveta=20Cucu?=",
-            "elisaveta.cucu@enerviva.it",
-            "elisaveta_cucu",
+            "=?UTF-8?Q?Anna=20Bianchi?=",
+            "bianchi.anna@example.com",
+            "anna_bianchi",
         ),
         (
-            "=?UTF-8?Q?Jean=2DFran=C3=A7ois_Fiset?=",
-            "jeff@parabole.ca",
-            "jean_françois_fiset",
+            "=?UTF-8?Q?Jean=2DPierre_Dubois?=",
+            "dubois@example.com",
+            "jean_pierre_dubois",
         ),
         # iso‑8859‑1 charset
         (
-            "=?iso-8859-1?Q?nicol=F2?=",
-            "valentina.n87@gmail.com",
-            "nicolò",
+            "=?iso-8859-1?Q?andr=E8?=",
+            "andre@example.com",
+            "andrè",
         ),
         (
-            "=?ISO-8859-1?Q?=C9quipe_Google=2B?=",
-            "noreply-475ba29f@plus.google.com",
-            "équipe_google",
+            "=?ISO-8859-1?Q?=C9quipe_Support=2B?=",
+            "noreply-support@example.com",
+            "équipe_support",
         ),
         # Base‑64 (B) encoding
         (
-            "=?UTF-8?B?SW5mbyBCb25Cb2FyZA==?=",
-            "info98464+ims@indeedemail.com",
-            "info_bonboard",
+            "=?UTF-8?B?Sm9obiBEb2U=?=",
+            "john.doe@example.com",
+            "john_doe",
         ),
         (
-            "=?UTF-8?B?QkFSQUtVREEwNyBCQVJBS1VEQTA3?=",
-            "tabuhovr@mail.ru",
-            "barakuda07_barakuda07",
+            "=?UTF-8?B?SEVMTE9XT1JMRCBIRUxMT1dPUkxE?=",
+            "hello@example.com",
+            "helloworld_helloworld",
         ),
         # KOI8‑R (Cyrillic)
         (
             "=?KOI8-R?B?9MnN1dIg9MHP1w==?=",
-            "timurtaov@mail.ru",
+            "ivan@example.com",
             "тимур_таов",
         ),
     ],
@@ -80,10 +80,10 @@ def test_mime_decoded(name: str, email: str, expected: str) -> None:
 @pytest.mark.parametrize(
     ("name", "email", "expected"),
     [
-        ('"Maria Lea', "maria.lea@test.com", "maria_lea"),
-        ('"TAOV', "nasir.taov@gmail.com", "taov"),
+        ('"Maria Lea', "maria.lea@example.com", "maria_lea"),
+        ('"SMITH', "john.smith@example.com", "smith"),
         ('"Guaitini', "guaitini@example.com", "guaitini"),
-        ("  Bandirali Ivana  ", "ivana.bandirali@iulm.it", "bandirali_ivana"),
+        ("  Bond James  ", "james.bond@example.com", "bond_james"),
     ],
 )
 def test_quotes_and_whitespace(name: str, email: str, expected: str) -> None:
@@ -97,8 +97,8 @@ def test_quotes_and_whitespace(name: str, email: str, expected: str) -> None:
 @pytest.mark.parametrize(
     ("name", "email", "expected"),
     [
-        ("Pipparoni Giulio", "giulio.1993@live.it", "pipparoni_giulio"),
-        ("f@oval-money.intercom-mail.com", "", "f_oval_money_intercom_mail_com"),
+        ("Verdi Luigi", "luigi.verdi@example.com", "verdi_luigi"),
+        ("f@example.com", "", "f_example_com"),
         ("Undisclosed recipients:;", "undisclosed recipients:;", "undisclosed_recipients"),
     ],
 )
@@ -112,7 +112,7 @@ def test_special_chars_to_underscore(name: str, email: str, expected: str) -> No
 
 def test_collapses_multiple_underscores() -> None:
     """Runs of non‑word chars collapse to a single underscore, no leading/trailing."""
-    assert _normalize_id(",,,Hello!!!World...", "h@x.com") == "hello_world"
+    assert _normalize_id(",,,Hello!!!World...", "h@example.com") == "hello_world"
 
 
 # ── Empty / missing name falls back to email local part ───────────────────────
@@ -122,7 +122,7 @@ def test_collapses_multiple_underscores() -> None:
     ("name", "email", "expected"),
     [
         ("", "alice@example.com", "alice"),
-        ("   ", "bob.smith@domain.org", "bob.smith"),
+        ("   ", "bob.smith@example.com", "bob.smith"),
     ],
 )
 def test_empty_name_falls_back(name: str, email: str, expected: str) -> None:
@@ -135,4 +135,4 @@ def test_empty_name_falls_back(name: str, email: str, expected: str) -> None:
 
 def test_already_clean_is_idempotent() -> None:
     """Names that already look like clean IDs stay the same."""
-    assert _normalize_id("alice_wonderland", "alice@x.com") == "alice_wonderland"
+    assert _normalize_id("alice_wonderland", "alice@example.com") == "alice_wonderland"
