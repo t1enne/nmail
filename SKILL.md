@@ -10,6 +10,26 @@ nmail is a composable Unix mail toolkit that treats email as plain data, letting
 
 `nmail` is a Python CLI tool that treats email as data (Maildir + Markdown). Every subcommand is a standalone action — composable with pipes, fzf, and shell pipelines.
 
+## Documentation
+
+Detailed usage docs in the repo:
+
+- `doc/01-cli-spec.md` — Every subcommand, flag, output format
+- `doc/02-configuration.md` — TOML config, hooks, env overrides
+- `doc/03-composability.md` — Pipe philosophy and patterns
+- `doc/04-example-pipelines.md` — Concrete pipeline recipes
+- `doc/05-installation-and-e2e-guide.md` — Install + guided walkthrough
+
+## Requirements
+
+nmail must be installed before use. See the [install guide](https://github.com/nasrt/nmail/blob/main/INSTALL.md) and [configuration guide](https://github.com/nasrt/nmail/blob/main/CONFIG.md) in the GitHub repo.
+
+In short:
+
+- **System deps:** msmtp (SMTP), mbsync (IMAP), Python ≥3.11. Recommended: notmuch, bat, fzf.
+- **Install:** `uv tool install git+https://github.com/nasrt/nmail`
+- **Configure:** `~/.msmtprc` (SMTP), `~/.mbsyncrc` (IMAP), `~/.config/nmail/config.toml` (optional)
+
 ## Quick Reference
 
 ```bash
@@ -340,8 +360,6 @@ Key env overrides: `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFI
 | **Optional**    | ripgrep (better grep fallback), inotify-tools (efficient watch), notify-send (desktop notifications) |
 
 msmtp and mbsync are practically mandatory — without SMTP you can't send, without IMAP sync you can't receive. The binary names are configurable (`smtp.command`, `sync.tool`) but the function isn't optional.
-
-**Install:** `uv tool install .` or `uv run nmail --help` for dev
 
 ## Composing Commands (Pipes & Patterns)
 

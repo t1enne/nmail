@@ -25,31 +25,26 @@ nmail contacts alice | awk '{print $2}' | head -1 | xargs nmail compose --to
 
 ```bash
 # Install
-uv tool install .
+uv tool install git+https://github.com/nasrt/nmail
 
-# Or for development
-uv run nmail --help
-
-# Configure msmtp for SMTP
+# Configure SMTP (required — without it you can't send)
 $EDITOR ~/.msmtprc
 
-# Configure mbsync for IMAP
+# Configure IMAP (required — without it you can't receive)
 $EDITOR ~/.mbsyncrc
 
-# Edit nmail config (optional — defaults work)
+# Configure nmail (optional — defaults work)
 $EDITOR ~/.config/nmail/config.toml
 
-# Sync mail
+# Sync and compose
 nmail sync
-
-# Compose a draft
 nmail compose
-
-# Send queued mail
 nmail send
 ```
 
-> **Dependencies:** Python ≥3.11, click, tomli. Recommended: msmtp (SMTP), mbsync (IMAP), notmuch (search), bat (pager), fzf (browse).
+> **Full install guide:** [INSTALL.md](INSTALL.md) — system dependencies, all install methods, shell integration.
+>
+> **Configuration guide:** [CONFIG.md](CONFIG.md) — nmail config, msmtp, mbsync, notmuch, hooks, templates.
 
 ### Composing Pipelines
 
@@ -165,67 +160,19 @@ John
 
 ## Directory Structure
 
-```
-~/.config/nmail/
-├── config.toml          # Main configuration
-└── hooks.d/             # Event hook scripts (on-new, on-sent, on-error, etc.)
-
-~/Mail/
-├── incoming/{cur,new,tmp}/
-├── archive/cur/
-├── drafts/*.md
-├── sent/{cur,new,tmp}/
-├── trash/{cur,new,tmp}/
-├── queue/{cur,new,tmp}/
-├── templates/*.md
-├── attachments/
-└── logs/
-    └── nmail.log        # JSON-line event log
-```
+See [CONFIG.md](CONFIG.md#7-directory-layout-after-setup) for the full layout.
 
 ## Configuration
 
-```toml
-# ~/.config/nmail/config.toml
+See [CONFIG.md](CONFIG.md) for detailed configuration of nmail, msmtp, mbsync, notmuch, hooks, and templates.
 
-# Flat top-level keys (no [general] section)
-maildir = "~/Mail"
-pager = "bat --plain --language=email"
+Quick reference:
 
-[user]
-from = "John Doe <john@example.com>"
-
-[smtp]
-command = "msmtp"
-
-[sync]
-tool = "mbsync"
-accounts = ["personal"]
-interval = 300
-
-[notmuch]
-enabled = true
-command = "notmuch"
-
-[templates]
-dir = "~/Mail/templates"
-default = "default"
-
-[hooks]
-enabled = true
-dir = "~/.config/nmail/hooks.d"
-
-[logging]
-dir = "~/Mail/logs"
-level = "info"
-
-[notifications]
-enabled = true
-events = ["mail:new", "mail:error"]
-```
-
-Editor is read from `$EDITOR` or `$VISUAL` env vars (not config).
-Key env overrides: `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFIG_HOME`.
+- `~/.config/nmail/config.toml` — nmail settings (flat top-level keys, no `[general]` section)
+- `~/.msmtprc` — SMTP relay config (`chmod 600`)
+- `~/.mbsyncrc` — IMAP sync config (`chmod 600`)
+- `$EDITOR` / `$VISUAL` — editor for composing (read from env, not config)
+- `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFIG_HOME` — env overrides
 
 ## Development
 
@@ -242,34 +189,23 @@ uv run nmail --help
 
 ## Dependencies
 
-| Category        | Tools                                                                                                |
-| --------------- | ---------------------------------------------------------------------------------------------------- |
-| **Required**    | Python ≥3.11, click≥8.1, tomli≥2.0, msmtp (or other SMTP command), mbsync (or other IMAP sync tool)  |
-| **Recommended** | notmuch (tagging, fast search, unread counts), bat (pager), fzf (interactive browse)                 |
-| **Optional**    | ripgrep (better grep fallback), inotify-tools (efficient watch), notify-send (desktop notifications) |
+See [INSTALL.md](INSTALL.md#1-system-dependencies) for OS-specific package install commands.
 
-msmtp and mbsync are practically mandatory — without SMTP you can't send, without IMAP sync you can't receive. The binary names are configurable (`smtp.command`, `sync.tool`) but the function isn't optional.
+| Category        | Tools                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| **Required**    | Python ≥3.11, msmtp (SMTP send), mbsync (IMAP receive)                                          |
+| **Recommended** | notmuch (fast search & tags), bat (pager), fzf (interactive browse)                             |
+| **Optional**    | ripgrep (grep fallback), inotify-tools (efficient `watch`), notify-send (desktop notifications) |
 
 ## Documentation
 
-- `doc/00-architecture.md` — Architecture overview and data flows
-- `doc/01-directory-structure.md` — Full directory layout
-- `doc/02-process-flows.md` — Compose→Send, Sync→Search flows
-- `doc/03-cli-spec.md` — Complete CLI specification
-- `doc/04-configuration.md` — Configuration format and hooks
-- `doc/05-composability.md` — Composability patterns
-- `doc/06-hooks.md` — Plugin and hook architecture
-- `doc/07-implementation-plan.md` — Staged plan
-- `doc/08-example-pipelines.md` — Shell pipeline examples
-- `doc/09-installation-and-e2e-guide.md` — End-to-end setup guide
+Usage-focused docs in `doc/`:
 
-## Implementation Status
-
-- [x] Phase 0: compose, render, send, open, status, log
-- [x] Phase 1: sync, search, reply, forward, tag, archive, trash, contacts, watch
-- [x] Phase 2: hooks
-- [x] Phase 3: templates, attachments
-- [ ] Phase 4: MIME attachment encoding in render, markdown→HTML rendering, plugins
+- `doc/01-cli-spec.md` — Complete CLI specification (every subcommand, flag, output format)
+- `doc/02-configuration.md` — TOML config format, hooks, env overrides
+- `doc/03-composability.md` — Composability philosophy and pipe patterns
+- `doc/04-example-pipelines.md` — Concrete shell pipeline recipes
+- `doc/05-installation-and-e2e-guide.md` — End-to-end setup and guided walkthrough
 
 ## License
 
