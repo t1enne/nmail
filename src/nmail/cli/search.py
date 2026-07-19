@@ -20,9 +20,10 @@ from ..shared import _all_maildir_files
 
 
 @click.command()
-@click.option("--interactive/--no-interactive", default=False)
+@click.option("--interactive/--no-interactive", "-i/--no-interactive", default=False)
 @click.option(
     "--format",
+    "-f",
     "fmt",
     type=click.Choice(["files", "ids", "json", "preview", "summary"]),
     default="summary",

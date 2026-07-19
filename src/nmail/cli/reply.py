@@ -13,8 +13,8 @@ from ..shared import _open_editor, _set_header
 
 
 @click.command()
-@click.option("--all", "reply_all", is_flag=True)
-@click.option("--template", "tmpl", default="reply")
+@click.option("--all", "-a", "reply_all", is_flag=True)
+@click.option("--template", "-t", "tmpl", default="reply")
 @click.option("--no-quote", is_flag=True)
 @click.argument("id")
 def reply(reply_all: bool, tmpl: str, no_quote: bool, id: str) -> None:

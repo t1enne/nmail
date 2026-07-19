@@ -13,7 +13,7 @@ from ..logging import log_event
 
 
 @click.command()
-@click.option("--once", is_flag=True)
+@click.option("--once", "-1", is_flag=True)
 @click.option("--no-hooks", is_flag=True)
 def watch(once: bool, no_hooks: bool) -> None:
     """Watch Maildir for new mail and fire events.

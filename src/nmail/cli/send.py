@@ -16,10 +16,10 @@ from ..render import render_message
 
 
 @click.command()
-@click.option("--dry-run", is_flag=True)
-@click.option("--id", "msg_id", default=None)
-@click.option("--retry", type=int, default=1)
-@click.option("--all", "send_all", is_flag=True)
+@click.option("--dry-run", "-n", is_flag=True)
+@click.option("--id", "-m", "msg_id", default=None)
+@click.option("--retry", "-r", type=int, default=1)
+@click.option("--all", "-a", "send_all", is_flag=True)
 def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
     """Send queued messages via SMTP.
 

@@ -17,9 +17,9 @@ from ..message import decode_rfc2047
 
 
 @click.command()
-@click.option("--update", is_flag=True)
-@click.option("--interactive/--no-interactive", default=False)
-@click.option("--format", "fmt", type=click.Choice(["tsv", "json", "email"]), default="tsv")
+@click.option("--update", "-u", is_flag=True)
+@click.option("--interactive/--no-interactive", "-i/--no-interactive", default=False)
+@click.option("--format", "-f", "fmt", type=click.Choice(["tsv", "json", "email"]), default="tsv")
 @click.argument("query", required=False)
 def contacts(update: bool, interactive: bool, fmt: str, query: str | None) -> None:
     """Search and manage contacts.

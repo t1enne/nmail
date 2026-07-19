@@ -16,8 +16,8 @@ from ..shared import _resolve_ids
 
 
 @click.command("open")
-@click.option("--headers-only", is_flag=True)
-@click.option("--raw", "raw_mode", is_flag=True)
+@click.option("--headers-only", "-H", is_flag=True)
+@click.option("--raw", "-r", "raw_mode", is_flag=True)
 @click.argument("ids", nargs=-1)
 def open_cmd(headers_only: bool, raw_mode: bool, ids: tuple[str, ...]) -> None:
     """Open a message in your pager.

@@ -15,7 +15,7 @@ from ..shared import _resolve_ids
 @click.command()
 @click.option("--empty", is_flag=True)
 @click.option("--age", type=int, default=None)
-@click.option("--force", is_flag=True)
+@click.option("--force", "-f", is_flag=True)
 @click.argument("ids", nargs=-1)
 def trash(empty: bool, age: int | None, force: bool, ids: tuple[str, ...]) -> None:
     """Move messages to trash or manage trash.

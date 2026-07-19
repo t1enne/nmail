@@ -15,14 +15,14 @@ from ..shared import _open_editor
 
 
 @click.command()
-@click.option("--to", default=None)
-@click.option("--cc", default=None)
-@click.option("--bcc", default=None)
-@click.option("--subject", default=None)
-@click.option("--attach", "attachments", multiple=True)
+@click.option("--to", "-t", default=None)
+@click.option("--cc", "-c", default=None)
+@click.option("--bcc", "-b", default=None)
+@click.option("--subject", "-s", default=None)
+@click.option("--attach", "-a", "attachments", multiple=True)
 @click.option("--no-send", is_flag=True)
-@click.option("--queue", "force_queue", is_flag=True)
-@click.option("--stdin", "from_stdin", is_flag=True)
+@click.option("--queue", "-q", "force_queue", is_flag=True)
+@click.option("--stdin", "-i", "from_stdin", is_flag=True)
 @click.argument("draft_arg", required=False)
 def compose(
     to: str | None,

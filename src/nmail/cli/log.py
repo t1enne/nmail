@@ -12,11 +12,11 @@ from ..config import get_config
 
 
 @click.command("log")
-@click.option("--follow", is_flag=True)
-@click.option("--since", default=None)
-@click.option("--level", default=None)
-@click.option("--event", "event_filter", default=None)
-@click.option("--json", "as_json", is_flag=True)
+@click.option("--follow", "-f", is_flag=True)
+@click.option("--since", "-s", default=None)
+@click.option("--level", "-l", default=None)
+@click.option("--event", "-e", "event_filter", default=None)
+@click.option("--json", "-j", "as_json", is_flag=True)
 def log_cmd(
     follow: bool, since: str | None, level: str | None, event_filter: str | None, as_json: bool
 ) -> None:

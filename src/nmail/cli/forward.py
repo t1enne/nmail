@@ -12,7 +12,7 @@ from ..shared import _open_editor
 
 
 @click.command()
-@click.option("--template", "tmpl", default="forward")
+@click.option("--template", "-t", "tmpl", default="forward")
 @click.argument("id")
 def forward(tmpl: str, id: str) -> None:
     """Forward a message.

@@ -12,8 +12,8 @@ from ..notmuch import notmuch_available, notmuch_count
 
 
 @click.command()
-@click.option("--json", "as_json", is_flag=True)
-@click.option("--watch", "watch_mode", is_flag=True)
+@click.option("--json", "-j", "as_json", is_flag=True)
+@click.option("--watch", "-w", "watch_mode", is_flag=True)
 def status(as_json: bool, watch_mode: bool) -> None:
     """Show mailbox statistics.
 

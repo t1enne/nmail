@@ -16,8 +16,8 @@ from ..notmuch import notmuch_new
 
 
 @click.command()
-@click.option("--account", default=None)
-@click.option("--dry-run", is_flag=True)
+@click.option("--account", "-a", default=None)
+@click.option("--dry-run", "-n", is_flag=True)
 @click.option("--no-index", is_flag=True)
 def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
     """Sync mail from IMAP.

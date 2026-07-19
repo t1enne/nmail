@@ -10,7 +10,7 @@ from ..render import render_message
 
 
 @click.command("render")
-@click.option("--format", "fmt", type=click.Choice(["plain", "mime", "html"]), default="mime")
+@click.option("--format", "-f", "fmt", type=click.Choice(["plain", "mime", "html"]), default="mime")
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 def render_cmd(fmt: str, file: Path) -> None:
     """Render a draft to RFC5322 MIME format.
