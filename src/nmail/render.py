@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import email.message
 import email.policy
+import html
 import re
 import uuid
 from pathlib import Path
@@ -50,6 +51,233 @@ def _parse_headers_block(headers_str: str) -> dict[str, str]:
 
 def _generate_boundary() -> str:
     return f"==============={uuid.uuid4().hex[:16]}"
+
+
+def _markdown_to_html(md: str) -> str:
+    """Convert markdown to HTML. No deps — regex-based, covers nmail's subset."""
+    text = md
+
+    # ── Block-level transforms (process line-by-line) ──
+    lines = text.split("\n")
+    out: list[str] = []
+    in_blockquote = False
+    in_code = False
+    code_buf: list[str] = []
+    code_lang = ""
+    ul_buf: list[str] = []
+    ol_buf: list[str] = []
+    table_buf: list[str] = []
+
+    def _flush_code() -> None:
+        nonlocal in_code, code_buf, code_lang
+        if code_buf:
+            code = html.escape("\n".join(code_buf))
+            cls = f' class="language-{html.escape(code_lang, quote=True)}"' if code_lang else ""
+            out.append(f"<pre><code{cls}>{code}</code></pre>")
+            code_buf = []
+            code_lang = ""
+            in_code = False
+
+    def _flush_ul() -> None:
+        nonlocal ul_buf
+        if ul_buf:
+            for item in ul_buf:
+                out.append(f"<li>{_inline(item)}</li>")
+            out[-len(ul_buf)] = f"<ul>{out[-len(ul_buf)]}"
+            out.append("</ul>")
+            ul_buf = []
+
+    def _flush_ol() -> None:
+        nonlocal ol_buf
+        if ol_buf:
+            for item in ol_buf:
+                out.append(f"<li>{_inline(item)}</li>")
+            out[-len(ol_buf)] = f"<ol>{out[-len(ol_buf)]}"
+            out.append("</ol>")
+            ol_buf = []
+
+    def _flush_table() -> None:
+        nonlocal table_buf
+        if not table_buf:
+            return
+        # First row is header, second row is separator (already filtered)
+        rows = []
+        for i, row in enumerate(table_buf):
+            cells = row.split("|")
+            # Remove empty first/last from leading/trailing pipe
+            if cells and not cells[0].strip():
+                cells = cells[1:]
+            if cells and not cells[-1].strip():
+                cells = cells[:-1]
+            cells = [c.strip() for c in cells]
+            tag = "th" if i == 0 else "td"
+            rows.append(f"<tr>{"".join(f"<{tag}>{_inline(c)}</{tag}>" for c in cells)}</tr>")
+        out.append(f"<table>{"".join(rows)}</table>")
+        table_buf = []
+
+    def _close_blockquote() -> None:
+        nonlocal in_blockquote
+        if in_blockquote:
+            out.append("</blockquote>")
+            in_blockquote = False
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        # Code fence start/end
+        if line.startswith("```"):
+            if not in_code:
+                _flush_ul()
+                _flush_ol()
+                _close_blockquote()
+                in_code = True
+                code_buf = []
+                code_lang = line[3:].strip()
+            else:
+                _flush_code()
+            i += 1
+            continue
+
+        if in_code:
+            code_buf.append(line)
+            i += 1
+            continue
+
+        # Blank line — flush pending blocks
+        if not line.strip():
+            _flush_table()
+            _flush_ul()
+            _flush_ol()
+            _close_blockquote()
+            out.append("")
+            i += 1
+            continue
+
+        # Horizontal rule
+        if re.match(r"^[-*_]{3,}\s*$", line):
+            _flush_table()
+            _flush_ul()
+            _flush_ol()
+            _close_blockquote()
+            out.append("<hr>")
+            i += 1
+            continue
+
+        # Table row
+        if line.startswith("|") and "|" in line[1:]:
+            _flush_ul()
+            _flush_ol()
+            _close_blockquote()
+            # Skip separator row (|---|...|)
+            stripped = line.replace("|", "")
+            if not (stripped and all(c in " -:" for c in stripped)):
+                table_buf.append(line)
+            i += 1
+            continue
+        else:
+            _flush_table()
+
+        # Headings
+        hm = re.match(r"^(#{1,6})\s+(.+)$", line)
+        if hm:
+            _flush_ul()
+            _flush_ol()
+            _close_blockquote()
+            level = len(hm.group(1))
+            out.append(f"<h{level}>{_inline(hm.group(2))}</h{level}>")
+            i += 1
+            continue
+
+        # Blockquotes
+        qm = re.match(r"^>\s?(.*)$", line)
+        if qm:
+            _flush_ul()
+            _flush_ol()
+            if not in_blockquote:
+                out.append("<blockquote>")
+                in_blockquote = True
+            content = qm.group(1)
+            out.append(_inline(content) if content else "")
+            i += 1
+            continue
+        else:
+            _close_blockquote()
+
+        # Unordered list item
+        um = re.match(r"^\s*[-*+]\s+(.+)$", line)
+        if um:
+            _flush_table()
+            _flush_ol()
+            _close_blockquote()
+            ul_buf.append(um.group(1))
+            i += 1
+            continue
+        else:
+            _flush_ul()
+
+        # Ordered list item
+        om = re.match(r"^\s*\d+\.\s+(.+)$", line)
+        if om:
+            _flush_table()
+            _flush_ul()
+            _close_blockquote()
+            ol_buf.append(om.group(1))
+            i += 1
+            continue
+        else:
+            _flush_ol()
+
+        # Regular paragraph line — gather until blank, list, heading, hr, blockquote, or table
+        _flush_table()
+        _flush_ul()
+        _flush_ol()
+        para: list[str] = [line]
+        i += 1
+        while i < len(lines):
+            nxt = lines[i]
+            if not nxt.strip() or nxt.startswith("|") or re.match(r"^[#>\-*_~]|\d+\.\s", nxt):
+                break
+            para.append(nxt)
+            i += 1
+        out.append(f"<p>{_inline(' '.join(p.strip() for p in para if p.strip()))}</p>")
+
+    # Flush any remaining
+    _flush_code()
+    _flush_table()
+    _flush_ul()
+    _flush_ol()
+    _close_blockquote()
+
+    return "\n".join(out).strip()
+
+
+def _inline(text: str) -> str:
+    """Apply inline markdown transforms to a text string.
+
+    First escapes HTML special chars (<, >, &) — markdown delimiters
+    like ** * ` ~~ [ ] ( ) do not contain these so they survive.
+    Then applies markdown-to-HTML regex substitutions.
+    """
+    text = html.escape(text, quote=False)
+    # Bold italic *** or ___ — must run before bold/italic
+    text = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", text)
+    text = re.sub(r"___(.+?)___", r"<strong><em>\1</em></strong>", text)
+    # Bold ** or __
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
+    # Italic * or _
+    text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
+    text = re.sub(r"_(.+?)_", r"<em>\1</em>", text)
+    # Strikethrough ~~
+    text = re.sub(r"~~(.+?)~~", r"<del>\1</del>", text)
+    # Inline code
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+    # Images before links
+    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img src="\2" alt="\1">', text)
+    # Links
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+    return text
 
 
 def _plain_text(markdown: str) -> str:
@@ -144,7 +372,7 @@ def render_message(path: Path, fmt: str = "mime") -> str:
     if fmt == "plain":
         msg.set_content(_plain_text(body))
     elif fmt == "html":
-        msg.set_content(_plain_text(body))  # no markdown→html in core
+        msg.set_content(_markdown_to_html(body), subtype="html", charset="utf-8")
     else:  # mime — multipart/alternative
         boundary = _generate_boundary()
         msg["Content-Type"] = f'multipart/alternative; boundary="{boundary}"'
@@ -152,7 +380,7 @@ def render_message(path: Path, fmt: str = "mime") -> str:
         text_part.set_content(_plain_text(body), subtype="plain", charset="utf-8")
         html_part = email.message.EmailMessage()
         html_part.set_content(
-            f"<html><body><pre>{_plain_text(body)}</pre></body></html>",
+            f"<html><body>{_markdown_to_html(body)}</body></html>",
             subtype="html",
             charset="utf-8",
         )

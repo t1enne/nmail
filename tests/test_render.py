@@ -13,6 +13,7 @@ import pytest
 from nmail.render import (
     DraftParts,
     _generate_boundary,
+    _markdown_to_html,
     _plain_text,
     _strip_signature,
     parse_draft,
@@ -90,6 +91,42 @@ def test_draft_parts_with_attachments() -> None:
     assert "a.pdf" in dp.attachments
 
 
+# ── _markdown_to_html: tables ───────────────────────────────────────────────
+
+
+def test_md_html_table_basic() -> None:
+    md = "| H1 | H2 |\n|---|---|\n| A | B |"
+    result = _markdown_to_html(md)
+    assert "<table>" in result
+    assert "<th>H1</th>" in result
+    assert "<td>A</td>" in result
+
+
+def test_md_html_table_no_separator() -> None:
+    md = "| H1 | H2 |\n| A | B |"
+    result = _markdown_to_html(md)
+    # both rows treated as header + data (no separator to skip)
+    assert "<th>H1</th>" in result
+    assert "<td>A</td>" in result
+
+
+def test_md_html_table_with_paragraph() -> None:
+    md = "Before\n\n| H1 | H2 |\n|---|---|\n| A | B |\n\nAfter"
+    result = _markdown_to_html(md)
+    assert "<p>Before</p>" in result
+    assert "<table>" in result
+    assert "<p>After</p>" in result
+
+
+def test_md_html_table_inline_markdown() -> None:
+    md = "| **Bold** | *Italic* |\n|---|---|\n| `code` | [link](https://x.com) |"
+    result = _markdown_to_html(md)
+    assert "<strong>Bold</strong>" in result
+    assert "<em>Italic</em>" in result
+    assert "<code>code</code>" in result
+    assert '<a href="https://x.com">link</a>' in result
+
+
 # ── _plain_text ──────────────────────────────────────────────────────────────
 
 
@@ -153,6 +190,123 @@ def test_plain_text_strips_underscore_italic() -> None:
 
 def test_plain_text_handles_empty() -> None:
     assert _plain_text("") == ""
+
+
+# ── _markdown_to_html ─────────────────────────────────────────────────────────
+
+
+def test_md_html_headings() -> None:
+    result = _markdown_to_html("# H1\n## H2\n### H3")
+    assert "<h1>H1</h1>" in result
+    assert "<h2>H2</h2>" in result
+    assert "<h3>H3</h3>" in result
+
+
+def test_md_html_bold_italic() -> None:
+    result = _markdown_to_html("**bold** *italic* ***bolditalic***")
+    assert "<strong>bold</strong>" in result
+    assert "<em>italic</em>" in result
+    assert "<strong><em>bolditalic</em></strong>" in result
+
+
+def test_md_html_strikethrough() -> None:
+    result = _markdown_to_html("~~struck~~")
+    assert "<del>struck</del>" in result
+
+
+def test_md_html_lists() -> None:
+    result = _markdown_to_html("- a\n- b\n- c")
+    assert "<ul>" in result
+    assert "<li>a</li>" in result
+    assert "<li>b</li>" in result
+    assert "<li>c</li>" in result
+    assert "</ul>" in result
+
+
+def test_md_html_ordered_lists() -> None:
+    result = _markdown_to_html("1. first\n2. second\n3. third")
+    assert "<ol>" in result
+    assert "<li>first</li>" in result
+    assert "<li>second</li>" in result
+    assert "<li>third</li>" in result
+    assert "</ol>" in result
+
+
+def test_md_html_blockquotes() -> None:
+    result = _markdown_to_html("> line1\n> line2")
+    assert "<blockquote>" in result
+    assert "line1" in result
+    assert "line2" in result
+    assert "</blockquote>" in result
+
+
+def test_md_html_inline_code() -> None:
+    result = _markdown_to_html("Use `code` here")
+    assert "<code>code</code>" in result
+
+
+def test_md_html_code_block() -> None:
+    result = _markdown_to_html("```\nprint(1)\n```")
+    assert "<pre><code>" in result
+    assert "print(1)" in result
+    assert "</code></pre>" in result
+
+
+def test_md_html_code_block_with_lang() -> None:
+    result = _markdown_to_html("```python\nprint(1)\n```")
+    assert 'class="language-python"' in result
+
+
+def test_md_html_links() -> None:
+    result = _markdown_to_html("[example](https://x.com)")
+    assert '<a href="https://x.com">example</a>' in result
+
+
+def test_md_html_horizontal_rule() -> None:
+    result = _markdown_to_html("---")
+    assert "<hr>" in result
+
+
+def test_md_html_paragraphs() -> None:
+    result = _markdown_to_html("Para one.\n\nPara two.")
+    assert "<p>Para one.</p>" in result
+    assert "<p>Para two.</p>" in result
+
+
+def test_md_html_escapes_html() -> None:
+    result = _markdown_to_html("<script>alert(1)</script>")
+    assert "&lt;script&gt;" in result
+    assert "<script>" not in result
+
+
+def test_md_html_escapes_amp() -> None:
+    result = _markdown_to_html("AT&T")
+    assert "AT&amp;T" in result
+
+
+def test_md_html_full_message() -> None:
+    md = "# Heading\n\nBold: **text**\n\n- item 1\n- item 2\n\n> quote"
+    result = _markdown_to_html(md)
+    assert "<h1>Heading</h1>" in result
+    assert "<strong>text</strong>" in result
+    assert "<ul>" in result
+    assert "<blockquote>" in result
+
+
+def test_render_mime_has_rendered_html() -> None:
+    d = _write_draft("From: a@x.com\nTo: b@x.com\nSubject: Test\n\n---\n\n# Hello\n\n**world**")
+    result = render_message(d, "mime")
+    assert "<h1>Hello</h1>" in result
+    assert "<strong>world</strong>" in result
+    d.unlink()
+
+
+def test_render_html_has_rendered_html() -> None:
+    d = _write_draft("From: a@x.com\nTo: b@x.com\nSubject: Test\n\n---\n\n# Hello\n\n**world**")
+    result = render_message(d, "html")
+    assert "<h1>Hello</h1>" in result
+    assert "<strong>world</strong>" in result
+    d.unlink()
 
 
 # ── _strip_signature ─────────────────────────────────────────────────────────
