@@ -26,9 +26,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nasrt/nmail"
-Repository = "https://github.com/nasrt/nmail"
-Issues = "https://github.com/nasrt/nmail/issues"
+Homepage = "https://github.com/t1enne/nmail"
+Repository = "https://github.com/t1enne/nmail"
+Issues = "https://github.com/t1enne/nmail/issues"
 
 [project.scripts]
 nmail = "nmail.cli:main"
