@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import click
@@ -15,9 +18,10 @@ from ..message import decode_rfc2047
 
 @click.command()
 @click.option("--update", is_flag=True)
-@click.option("--format", "fmt", type=click.Choice(["tsv", "json"]), default="tsv")
+@click.option("--interactive/--no-interactive", default=False)
+@click.option("--format", "fmt", type=click.Choice(["tsv", "json", "email"]), default="tsv")
 @click.argument("query", required=False)
-def contacts(update: bool, fmt: str, query: str | None) -> None:
+def contacts(update: bool, interactive: bool, fmt: str, query: str | None) -> None:
     """Search and manage contacts.
 
     Builds contact database from email headers (From, To, Cc).
@@ -27,7 +31,9 @@ def contacts(update: bool, fmt: str, query: str | None) -> None:
 
     nmail contacts --update
     nmail contacts alice
+    nmail contacts --interactive
     nmail contacts --format json
+    nmail contacts --format email alice   # prints email only (for scripts)
     """
     state_dir = Path.home() / ".local" / "state" / "nmail"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -44,8 +50,16 @@ def contacts(update: bool, fmt: str, query: str | None) -> None:
     entries = _read_contacts(contacts_file)
     if query:
         entries = [(n, e, c) for n, e, c in entries if query.lower() in f"{n} {e}".lower()]
+
+    if interactive:
+        _contacts_interactive(entries)
+        return
+
     if fmt == "json":
         click.echo(json.dumps([{"name": n, "email": e, "count": c} for n, e, c in entries]))
+    elif fmt == "email":
+        for name, email, count in entries:
+            click.echo(email)
     else:
         for name, email, count in entries:
             click.echo(f"{name:40}\t{email:40s}\t{count:2d}")
@@ -92,6 +106,57 @@ def _rebuild_contacts(path: Path) -> None:
     with open(path, "w") as f:
         for (name, email), count in sorted(counter.items(), key=lambda x: -x[1]):
             f.write(f"{name}\t{email}\t{count}\n")
+
+
+def _contacts_interactive(entries: list[tuple[str, str, int]]) -> None:
+    """Pipe contacts through fzf for interactive browsing.
+
+    Falls back to non-interactive TSV output if fzf not available.
+    """
+    if not entries:
+        return
+
+    if not shutil.which("fzf"):
+        click.echo("fzf not found. Install fzf for interactive mode.", err=True)
+        for name, email, count in entries:
+            click.echo(f"{name:40}\t{email:40s}\t{count:2d}")
+        return
+
+    try:
+        tty_fd = os.open("/dev/tty", os.O_RDONLY)
+    except OSError:
+        click.echo("interactive mode requires a terminal", err=True)
+        raise SystemExit(1) from None
+
+    # Format: name<TAB>email — one per line
+    fzf_input = "\n".join(f"{name}\t{email}" for name, email, _count in entries)
+
+    try:
+        proc = subprocess.run(
+            [
+                "fzf",
+                "--multi",
+                "--delimiter", "\t",
+                "--with-nth=1",
+                "--preview", "echo {2}",
+                "--preview-window", "bottom:1",
+                "--header", "Tab to select, Enter to confirm",
+            ],
+            input=fzf_input,
+            stdin=tty_fd,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+    finally:
+        os.close(tty_fd)
+
+    if proc.returncode == 0:
+        for line in proc.stdout.strip().splitlines():
+            if line:
+                parts = line.split("\t")
+                name = parts[0]
+                email = parts[1] if len(parts) > 1 else ""
+                click.echo(f"{name:40}\t{email:40s}")
 
 
 def _read_contacts(path: Path) -> list[tuple[str, str, int]]:
