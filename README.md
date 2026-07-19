@@ -11,6 +11,7 @@ nmail search --interactive tag:unread | while read id; do nmail open "$id"; done
 nmail search --interactive tag:todo   | while read id; do nmail reply "$id"; done
 
 # Batch operations via pipes (use --format ids for machine-readable IDs)
+nmail search --format ids tag:unread --quiet | nmail tag -- -unread -  # Mark all unread as read
 nmail search --format ids tag:todo | nmail archive -
 nmail search --format ids from:bob | nmail tag +bob -
 
@@ -50,6 +51,7 @@ nmail send
 
 ```bash
 # Daily inbox triage: tag, archive, trash in one pass
+nmail search --format ids tag:unread --quiet | nmail tag -- -unread -  # Mark all as read
 nmail search --format ids tag:unread from:alice | nmail tag +important -
 nmail search --format ids tag:unread subject:'newsletter' | nmail archive -
 nmail search --format ids subject:'spam' | nmail trash -

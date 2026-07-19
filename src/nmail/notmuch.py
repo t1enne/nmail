@@ -142,12 +142,11 @@ def notmuch_tag(op_tag: str, *ids: str) -> None:
     cfg = get_config()
     if not cfg.notmuch_enabled or not notmuch_available():
         return
+    # -- separates the tag operation from IDs (prevent notmuch from parsing
+    # IDs starting with - or + as additional operations).
+    cmd = [cfg.notmuch_command, "tag", op_tag, "--", *ids]
     with contextlib.suppress(Exception):
-        subprocess.run(
-            [cfg.notmuch_command, "tag", op_tag, *ids],
-            capture_output=True,
-            timeout=30,
-        )
+        subprocess.run(cmd, capture_output=True, timeout=30)
 
 
 def notmuch_new() -> None:

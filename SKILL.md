@@ -344,6 +344,7 @@ nmail search --interactive tag:unread | while read id; do nmail open "$id"; done
 nmail search --interactive tag:todo   | while read id; do nmail reply "$id"; done
 
 # Inbox triage: tag important senders, archive newsletters, trash spam
+nmail search --format ids tag:unread --quiet | nmail tag -- -unread -  # Mark all as read
 nmail search --format ids tag:unread from:boss@company.com | nmail tag +important -
 nmail search --format ids tag:unread subject:'weekly digest' | nmail archive -
 nmail search --format ids subject:'viagra' | nmail trash -
@@ -415,6 +416,7 @@ nmail status --json
 ### Archive / organize
 
 ```bash
+nmail search --format ids tag:unread --quiet | nmail tag -- -unread -  # Mark all as read
 nmail search --format ids tag:unread | nmail archive -
 nmail search --format ids from:bob | nmail tag +bob -
 nmail tag +important 182
