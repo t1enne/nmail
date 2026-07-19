@@ -40,6 +40,27 @@ from_address = "John Doe <john@example.com>"
 default_template = "default"
 
 # ---------------------------------------------------------------------------
+# Profiles (multi-account)
+# ---------------------------------------------------------------------------
+
+# Each profile gets its own subdirectory under maildir:
+#   ~/Mail/personal/incoming/, ~/Mail/personal/sent/, ...
+#   ~/Mail/work/incoming/,     ~/Mail/work/sent/, ...
+
+[profiles]
+# Default profile used when NM_PROFILE env is not set.
+# Empty string = flat mode (legacy, no subdir).
+default = "personal"
+
+[profiles.personal]
+sync_account = "personal"
+smtp_account = "personal"
+
+[profiles.work]
+sync_account = "work"
+smtp_account = "work"
+
+# ---------------------------------------------------------------------------
 # SMTP (sending)
 # ---------------------------------------------------------------------------
 
@@ -136,23 +157,6 @@ dir = "~/Mail/templates"
 
 # Default template to use
 default = "default"
-
-# ---------------------------------------------------------------------------
-# Per-account configuration
-# ---------------------------------------------------------------------------
-
-# SMTP account configuration (used by msmtp)
-# nmail itself doesn't read these — they're passed to msmtp/mbsync.
-
-# [[account]]
-# name = "personal"
-# email = "john@example.com"
-# smtp_host = "smtp.example.com"
-# smtp_port = 587
-# smtp_user = "john@example.com"
-# imap_host = "imap.example.com"
-# imap_port = 993
-# imap_user = "john@example.com"
 ```
 
 ## Environment Variables
@@ -171,6 +175,7 @@ All config values can be overridden via environment:
 | `MAIL_SYNC_TOOL` | `sync.tool` |
 | `MAIL_SYNC_INTERVAL` | `sync.interval` |
 | `MAIL_TMPL_DIR` | `templates.dir` |
+| `NM_PROFILE` | Active profile name (overrides config default) |
 | `NM_DRY_RUN` | (all commands: dry-run mode) |
 | `NM_VERBOSE` | (all commands: verbose output) |
 
@@ -204,6 +209,8 @@ account default : personal
 
 ## Sync Configuration (mbsync example)
 
+### Single profile
+
 `~/.mbsyncrc`:
 
 ```
@@ -217,16 +224,67 @@ IMAPStore personal-remote
 Account personal
 
 MaildirStore personal-local
-Path ~/Mail/incoming/
-Inbox ~/Mail/incoming/
+Path ~/Mail/
+Inbox ~/Mail/inbox
+SubFolders Verbatim
 
 Channel personal
 Far :personal-remote:
 Near :personal-local:
-Patterns *
-Create Near
-Sync All
+Patterns "INBOX" "[Gmail]/Sent Mail" "[Gmail]/Drafts" "[Gmail]/Trash"
+Create Both
 Expunge Both
+SyncState *
+```
+
+### Multiple profiles
+
+Each profile gets its own subdirectory under `~/Mail/`:
+
+```
+IMAPAccount personal
+Host imap.gmail.com
+User john@gmail.com
+PassCmd "pass show mail/personal"
+SSLType IMAPS
+
+IMAPStore personal-remote
+Account personal
+
+MaildirStore personal-local
+Path ~/Mail/personal/
+Inbox ~/Mail/personal/incoming
+SubFolders Verbatim
+
+Channel personal
+Far :personal-remote:
+Near :personal-local:
+Patterns "INBOX" "[Gmail]/Sent Mail" "[Gmail]/Drafts" "[Gmail]/Trash"
+Create Both
+Expunge Both
+SyncState *
+
+IMAPAccount work
+Host outlook.office365.com
+User john@company.com
+PassCmd "pass show mail/work"
+SSLType IMAPS
+
+IMAPStore work-remote
+Account work
+
+MaildirStore work-local
+Path ~/Mail/work/
+Inbox ~/Mail/work/incoming
+SubFolders Verbatim
+
+Channel work
+Far :work-remote:
+Near :work-local:
+Patterns "INBOX" "Sent Items" "Drafts" "Trash"
+Create Both
+Expunge Both
+SyncState *
 ```
 
 ## Hooks Directory

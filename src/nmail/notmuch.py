@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 
 from .config import get_config
-from .maildir import MAILDIR_SUBDIRS
+from .constants import ARCHIVE, INCOMING, MAILDIR_SUBDIRS, SENT
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,6 @@ logger = logging.getLogger(__name__)
 _NOTMUCH_PREFIXES = re.compile(
     r"\b(subject|from|to|tag|folder|path|id|thread|attachment|mimetype):", re.IGNORECASE
 )
-
-
-def _cmd(notmuch_cmd: str, *args: str) -> list[str]:
-    return [notmuch_cmd, *args]
 
 
 def notmuch_available() -> bool:
@@ -39,17 +35,34 @@ def notmuch_available() -> bool:
         return False
 
 
-def _rg_search(query: str) -> list[str]:
+def _search_dirs() -> list[Path]:
+    """Get all profile maildir paths to search, or flat paths."""
     cfg = get_config()
+    dirs: list[Path] = []
+    profiles = cfg.profiles
+    if profiles:
+        for prof in profiles:
+            for d in (INCOMING, ARCHIVE, SENT):
+                p = cfg.profile_path(prof, d)
+                if p.exists():
+                    dirs.append(p)
+    else:
+        for d in (INCOMING, ARCHIVE, SENT):
+            p = cfg.maildir / d
+            if p.exists():
+                dirs.append(p)
+    return dirs
+
+
+def _rg_search(query: str) -> list[str]:
     if not shutil.which("rg"):
         return _grep_search(query)
     files: list[str] = []
-    for d in (INCOMING, ARCHIVE, SENT):
-        p = cfg.maildir / d
-        if p.exists():
+    for d in _search_dirs():
+        if d.exists():
             try:
                 res = subprocess.run(
-                    ["rg", "-l", "--no-messages", query, str(p)],
+                    ["rg", "-l", "--no-messages", query, str(d)],
                     capture_output=True,
                     text=True,
                     timeout=30,
@@ -61,14 +74,12 @@ def _rg_search(query: str) -> list[str]:
 
 
 def _grep_search(query: str) -> list[str]:
-    cfg = get_config()
     files: list[str] = []
-    for d in (INCOMING, ARCHIVE, SENT):
-        p = cfg.maildir / d
-        if p.exists():
+    for d in _search_dirs():
+        if d.exists():
             try:
                 res = subprocess.run(
-                    ["grep", "-rl", query, str(p)],
+                    ["grep", "-rl", query, str(d)],
                     capture_output=True,
                     text=True,
                     timeout=30,
@@ -90,11 +101,6 @@ def _fallback_search(query: str) -> list[str]:
     return _rg_search(query)
 
 
-INCOMING = "incoming"
-ARCHIVE = "archive"
-SENT = "sent"
-
-
 def _exclude_trash(paths: list[str]) -> list[str]:
     """Filter out any path whose parent directory contains 'trash' (case-insensitive)."""
     return [p for p in paths if "trash" not in os.path.dirname(p).lower().split(os.sep)]
@@ -113,7 +119,7 @@ def notmuch_search(query: str, output: str = "files") -> list[str]:
             )
             results = [line for line in res.stdout.strip().splitlines() if line]
             results = _exclude_trash(results)
-            # Skip stale index entries (file was deleted since last notmuch new)
+            # Skip stale index entries
             results = [r for r in results if Path(r).is_file()]
             return results
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
@@ -142,8 +148,6 @@ def notmuch_tag(op_tag: str, *ids: str) -> None:
     cfg = get_config()
     if not cfg.notmuch_enabled or not notmuch_available():
         return
-    # -- separates the tag operation from IDs (prevent notmuch from parsing
-    # IDs starting with - or + as additional operations).
     cmd = [cfg.notmuch_command, "tag", op_tag, "--", *ids]
     with contextlib.suppress(Exception):
         subprocess.run(cmd, capture_output=True, timeout=30)
@@ -178,6 +182,20 @@ def _resolve_via_notmuch(id_str: str) -> Path | None:
     return None
 
 
+def _glob_dirs() -> list[Path]:
+    """Get all profile subdir paths for glob-based ID resolution."""
+    cfg = get_config()
+    dirs: list[Path] = []
+    profiles = cfg.profiles if cfg.profiles else [""]
+    for prof in profiles:
+        base = cfg.profile_path(prof)
+        for sub in MAILDIR_SUBDIRS:
+            base_sub = base / sub
+            if base_sub.exists():
+                dirs.append(base_sub)
+    return dirs
+
+
 def resolve_id(id_str: str) -> Path | None:
     """Resolve a message ID or file path to a Maildir file."""
     path = Path(id_str).expanduser()
@@ -189,14 +207,11 @@ def resolve_id(id_str: str) -> Path | None:
     if resolved and resolved.is_file():
         return resolved
 
-    # Fallback: glob over Maildir
-    cfg = get_config()
-    for subdir in MAILDIR_SUBDIRS:
-        d = cfg.maildir / subdir
-        if d.exists():
-            for p in d.rglob(f"{id_str}*"):
-                if p.is_file():
-                    return p
+    # Fallback: glob over all profile maildirs
+    for d in _glob_dirs():
+        for p in d.rglob(f"{id_str}*"):
+            if p.is_file():
+                return p
     return None
 
 

@@ -52,6 +52,8 @@ def test_ensure_maildir_creates_structure(
 
     cfg = Config()
     monkeypatch.setattr(Config, "maildir", property(lambda self: base))
+    monkeypatch.setattr(Config, "profiles", property(lambda _self: []))
+    monkeypatch.setattr(Config, "profile", property(lambda _self: None))
     monkeypatch.setattr(nmail.config, "_config", cfg)
 
     ensure_maildir()

@@ -171,8 +171,10 @@ Options:
 
 Behavior:
   Uses inotifywait to monitor:
-    ~/Mail/incoming/new/   (new mail)
-    ~/Mail/queue/new/      (new outbound)
+    ~/Mail/<profile>/incoming/new/   (new mail, per profile)
+    ~/Mail/<profile>/queue/new/      (new outbound, per profile)
+
+  When profiles are configured, watches all profiles' incoming/new/ dirs.
 
   On event:
     Logs to ~/Mail/logs/mail.log

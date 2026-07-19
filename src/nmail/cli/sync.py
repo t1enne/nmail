@@ -35,7 +35,10 @@ def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
     cfg = get_config()
     ensure_maildir()
     log_event("mail:sync-start")
-    before = maildir_count("incoming")
+
+    # Count before — sum across all profiles
+    profiles = cfg.profiles if cfg.profiles else [""]
+    before = sum(maildir_count(f"{prof}/incoming" if prof else "incoming") for prof in profiles)
 
     sync_tool = cfg.sync_tool
     if not shutil.which(sync_tool):
@@ -62,7 +65,7 @@ def sync(account: str | None, dry_run: bool, no_index: bool) -> None:
                 click.echo(f"Sync timed out: {acct}", err=True)
                 raise SystemExit(1) from None
 
-    after = maildir_count("incoming")
+    after = sum(maildir_count(f"{prof}/incoming" if prof else "incoming") for prof in profiles)
     new_msgs = after - before
     if not no_index:
         notmuch_new()

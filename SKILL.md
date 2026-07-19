@@ -147,7 +147,7 @@ Open message in pager (bat if available, otherwise configured pager).
 
 ```bash
 nmail open 182                       # Open by message ID
-nmail open ~/Mail/incoming/new/...   # Open by file path
+nmail open ~/Mail/personal/incoming/new/...   # Open by file path (profile-aware)
 nmail open --raw 182                 # Show raw RFC5322 message
 ```
 
@@ -402,8 +402,9 @@ nmail search --format ids 'from:@company.com AND NOT tag:work' | nmail tag +work
 # Failed sends? Retry
 nmail log --since 1h --event mail:error | grep -q . && nmail send --all
 
-# Export all archived mail to mbox
+# Export all archived mail to mbox (flat mode)
 find ~/Mail/archive/cur -type f | xargs cat > archive.mbox
+# Multi-profile: find ~/Mail/*/archive/cur -type f | xargs cat > archive.mbox
 ```
 
 ## Agent Usage Patterns

@@ -14,6 +14,7 @@ from .constants import (
     DEFAULT_SYNC_INTERVAL,
     DEFAULT_SYNC_TOOL,
     DEFAULT_TEMPLATE,
+    MAILDIR_SUBDIRS,
     NM_CONFIG_HOME,
     NM_MAILDIR,
 )
@@ -40,7 +41,67 @@ class Config:
 
     @property
     def maildir(self) -> Path:
-        return Path(os.environ.get("NM_MAILDIR", self._cfg.get("maildir", NM_MAILDIR))).expanduser()
+        # Check env first, then top-level maildir, then default
+        env_val = os.environ.get("NM_MAILDIR")
+        if env_val:
+            return Path(env_val).expanduser()
+        top_val = self._cfg.get("maildir")
+        if top_val:
+            return Path(top_val).expanduser()
+        gen_val = self._cfg.get("general", {}).get("maildir")
+        if gen_val:
+            return Path(gen_val).expanduser()
+        return NM_MAILDIR
+
+    @property
+    def profiles(self) -> list[str]:
+        """List of configured profile names."""
+        pcfg = self._cfg.get("profiles", {})
+        # Only keys with dict values are profile tables (not the 'default' key)
+        return [k for k, v in pcfg.items() if isinstance(v, dict)]
+
+    @property
+    def profile(self) -> str | None:
+        """Active profile (NM_PROFILE env, config default, or None for flat mode)."""
+        env = os.environ.get("NM_PROFILE")
+        if env:
+            return env
+        pcfg = self._cfg.get("profiles", {})
+        default_val = pcfg.get("default", None) if isinstance(pcfg, dict) else None
+        if isinstance(default_val, str) and default_val:
+            return default_val
+        return None
+
+    def profile_path(self, profile: str, subdir: str = "") -> Path:
+        """Resolve a profile's maildir path.
+
+        ~/Mail/<profile>/<subdir> when profile is set.
+        ~/Mail/<subdir> when profile is empty (flat / backward compat).
+        """
+        base = self.maildir
+        if profile:
+            base = base / profile
+        if subdir:
+            base = base / subdir
+        return base
+
+    def profile_subdirs(self, profile: str) -> list[Path]:
+        """All standard subdir paths for a profile."""
+        base = self.maildir / profile if profile else self.maildir
+        return [base / d for d in MAILDIR_SUBDIRS]
+
+    def all_maildir_files(self) -> list[str]:
+        """List all mail files across all profiles (flat or multi-profile)."""
+        from .maildir import maildir_list_all
+
+        files: list[str] = []
+        profiles = self.profiles if self.profiles else [""]
+        for prof in profiles:
+            for d in MAILDIR_SUBDIRS:
+                path_key = f"{prof}/{d}" if prof else d
+                for p in maildir_list_all(path_key):
+                    files.append(str(p))
+        return files
 
     @property
     def pager(self) -> str:

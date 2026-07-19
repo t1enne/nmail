@@ -10,6 +10,8 @@ nmail delegates sending to **msmtp** and receiving to **mbsync**. You must confi
 
 All keys are flat at the top level — no `[general]` section.
 
+### Single profile (flat mode)
+
 ```toml
 # ~/.config/nmail/config.toml
 
@@ -76,15 +78,46 @@ enabled = true
 events = ["mail:new", "mail:error"]
 ```
 
-### Environment variable overrides
+### Multiple profiles
 
-Every config key can be set via environment:
+When you have multiple accounts (e.g. personal and work), add a `[profiles]` section.
+Each profile gets its own subdirectory under `~/Mail/`:
+
+```toml
+# ~/.config/nmail/config.toml
+
+# ... other settings above ...
+
+[profiles]
+# Default profile used when NM_PROFILE env is not set.
+# Empty string = flat mode (no profile subdir).
+default = "personal"
+
+[profiles.personal]
+sync_account = "personal"
+smtp_account = "personal"
+
+[profiles.work]
+sync_account = "work"
+smtp_account = "work"
+```
+
+With this config:
+- `~/Mail/personal/incoming/` — personal inbox
+- `~/Mail/personal/sent/` — personal sent mail
+- `~/Mail/work/incoming/` — work inbox
+- `~/Mail/work/sent/` — work sent mail
+
+The profile name must match the mbsync Channel name in `~/.mbsyncrc`.
+
+### Environment variable overrides
 
 | Variable | Overrides |
 |---|---|
 | `NM_MAILDIR` | `maildir` |
 | `NM_PAGER` | `pager` |
 | `NM_FROM` | `user.from` |
+| `NM_PROFILE` | Active profile (overrides config default) |
 | `NM_SMTP_CMD` | `smtp.command` |
 | `NM_CONFIG_HOME` | Config directory path (alt to `~/.config/nmail`) |
 
@@ -169,6 +202,8 @@ Gmail requires an [App Password](https://support.google.com/accounts/answer/1858
 
 **File:** `~/.mbsyncrc`
 
+### Single profile (flat mode)
+
 ```
 # ~/.mbsyncrc
 
@@ -182,16 +217,73 @@ IMAPStore personal-remote
 Account personal
 
 MaildirStore personal-local
-Path ~/Mail/incoming/
-Inbox ~/Mail/incoming/
+Path ~/Mail/
+Inbox ~/Mail/inbox
+SubFolders Verbatim
 
 Channel personal
 Far :personal-remote:
 Near :personal-local:
-Patterns *
-Create Near
-Sync All
+Patterns "INBOX" "[Gmail]/Sent Mail" "[Gmail]/Drafts" "[Gmail]/Trash" "[Gmail]/Archive"
+Create Both
 Expunge Both
+SyncState *
+```
+
+### Multiple profiles
+
+Each profile gets its own subdirectory under `~/Mail/`. The profile name must match the mbsync Channel name and the nmail profile config key.
+
+```
+# ~/.mbsyncrc
+
+# Personal — Gmail
+IMAPAccount personal
+Host imap.gmail.com
+User you@gmail.com
+PassCmd "pass show mail/personal"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore personal-remote
+Account personal
+
+MaildirStore personal-local
+Path ~/Mail/personal/
+Inbox ~/Mail/personal/incoming
+SubFolders Verbatim
+
+Channel personal
+Far :personal-remote:
+Near :personal-local:
+Patterns "INBOX" "[Gmail]/Sent Mail" "[Gmail]/Drafts" "[Gmail]/Trash" "[Gmail]/Archive"
+Create Both
+Expunge Both
+SyncState *
+
+# Work — Outlook
+IMAPAccount work
+Host outlook.office365.com
+User you@company.com
+PassCmd "pass show mail/work"
+SSLType IMAPS
+AuthMechs LOGIN
+
+IMAPStore work-remote
+Account work
+
+MaildirStore work-local
+Path ~/Mail/work/
+Inbox ~/Mail/work/incoming
+SubFolders Verbatim
+
+Channel work
+Far :work-remote:
+Near :work-local:
+Patterns "INBOX" "Sent Items" "Drafts" "Trash"
+Create Both
+Expunge Both
+SyncState *
 ```
 
 **Permissions:** `chmod 600 ~/.mbsyncrc`
@@ -202,7 +294,7 @@ Expunge Both
 mbsync personal
 ```
 
-After sync, check `~/Mail/incoming/new/` — it should contain message files.
+After sync, check `~/Mail/personal/incoming/new/` — it should contain message files.
 
 ### Multiple accounts
 
@@ -346,6 +438,8 @@ Template variables:
 
 ## 7. Directory Layout After Setup
 
+### Single profile (flat mode)
+
 ```
 ~/.config/nmail/
 ├── config.toml          # nmail config
@@ -366,3 +460,43 @@ Template variables:
 └── logs/
     └── nmail.log             # JSON-line event log
 ```
+
+### Multiple profiles
+
+```
+~/.config/nmail/
+├── config.toml          # nmail config with [profiles] section
+└── hooks.d/             # hook scripts (optional)
+
+~/.msmtprc               # SMTP config (both accounts)
+~/.mbsyncrc              # IMAP config (both channels)
+
+~/Mail/
+├── personal/
+│   ├── incoming/{cur,new,tmp}/   # Personal inbox (~/Mail/personal/incoming/)
+│   ├── archive/                  # Archived messages
+│   ├── drafts/                   # Drafts in progress
+│   ├── sent/                     # Sent mail
+│   ├── trash/                    # Trash
+│   ├── queue/                    # Outgoing queue
+│   ├── templates/                # Draft templates
+│   ├── attachments/              # Saved attachments
+│   ├── logs/                     # Activity logs
+│   └── [Gmail]/                  # Gmail subfolders (with SubFolders Verbatim)
+│
+├── work/
+│   ├── incoming/{cur,new,tmp}/   # Work inbox
+│   ├── archive/
+│   ├── drafts/
+│   ├── sent/
+│   ├── trash/
+│   └── queue/
+│
+├── queue/               # Outgoing queue (fallback, flat mode)
+├── templates/           # Templates (fallback, flat mode)
+├── attachments/
+└── logs/
+    └── nmail.log
+```
+
+Each profile has its own isolated Maildir tree. `nmail status` shows per-profile stats. `nmail search`, `nmail archive`, `nmail trash` all operate across all profiles.

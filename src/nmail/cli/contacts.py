@@ -11,6 +11,7 @@ from pathlib import Path
 
 import click
 
+from ..config import get_config
 from ..headers import extract_header
 from ..maildir import maildir_list_all
 from ..message import decode_rfc2047
@@ -83,26 +84,30 @@ def _normalize_id(name: str, email: str) -> str:
 def _rebuild_contacts(path: Path) -> None:
     click.echo("Scanning mailbox for contacts...", err=True)
     counter: dict[tuple[str, str], int] = {}
-    for subdir in ("incoming", "archive", "sent"):
-        msgs = maildir_list_all(subdir)
-        click.echo(f"  {subdir}: {len(msgs)} messages", err=True)
-        for msg in msgs:
-            for hdr in ("From", "To", "Cc"):
-                val = extract_header(msg, hdr)
-                if not val:
-                    continue
-                for addr in val.split(","):
-                    addr = addr.strip()
-                    if "<" in addr and ">" in addr:
-                        name = addr[: addr.index("<")].strip().strip('"')
-                        email = addr[addr.index("<") + 1 : addr.index(">")].strip()
-                    else:
-                        name = ""
-                        email = addr
-                    if email:
-                        clean_id = _normalize_id(name, email)
-                        key = (clean_id, email.lower())
-                        counter[key] = counter.get(key, 0) + 1
+    cfg = get_config()
+    profiles = cfg.profiles if cfg.profiles else [""]
+    for prof in profiles:
+        for subdir in ("incoming", "archive", "sent"):
+            path_key = f"{prof}/{subdir}" if prof else subdir
+            msgs = maildir_list_all(path_key)
+            click.echo(f"  {path_key}: {len(msgs)} messages", err=True)
+            for msg in msgs:
+                for hdr in ("From", "To", "Cc"):
+                    val = extract_header(msg, hdr)
+                    if not val:
+                        continue
+                    for addr in val.split(","):
+                        addr = addr.strip()
+                        if "<" in addr and ">" in addr:
+                            name = addr[: addr.index("<")].strip().strip('"')
+                            email = addr[addr.index("<") + 1 : addr.index(">")].strip()
+                        else:
+                            name = ""
+                            email = addr
+                        if email:
+                            clean_id = _normalize_id(name, email)
+                            key = (clean_id, email.lower())
+                            counter[key] = counter.get(key, 0) + 1
     with open(path, "w") as f:
         for (name, email), count in sorted(counter.items(), key=lambda x: -x[1]):
             f.write(f"{name}\t{email}\t{count}\n")

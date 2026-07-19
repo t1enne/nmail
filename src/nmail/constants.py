@@ -25,6 +25,7 @@ MAILDIR_SUBDIRS: Final = (INCOMING, ARCHIVE, SENT, DRAFTS, QUEUE, TRASH)
 MAILDIR_SUBFOLDERS: Final = ("new", "cur", "tmp")
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
+DEFAULT_PROFILE: Final = ""  # empty = flat mode (backward compat)
 DEFAULT_TEMPLATE: Final = "default"
 DEFAULT_PAGER: Final = "less"
 DEFAULT_SMTP_CMD: Final = "msmtp -t"

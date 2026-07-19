@@ -17,11 +17,13 @@ def create_draft(
     subject: str | None = None,
     cc: str | None = None,
     bcc: str | None = None,
+    profile: str | None = None,
 ) -> Path:
     """Create a new draft file from a template. Returns path to draft."""
     cfg = get_config()
-    ensure_maildir()
-    drafts_dir = cfg.maildir / "drafts"
+    prof = profile if profile is not None else cfg.profile or ""
+    ensure_maildir(prof)
+    drafts_dir = cfg.profile_path(prof, "drafts")
     drafts_dir.mkdir(parents=True, exist_ok=True)
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -80,9 +82,15 @@ def validate_draft(path: Path) -> bool:
 
 
 def queue_draft(path: Path) -> Path:
-    """Move draft to queue/new/."""
+    """Move draft to queue/new/. Detects profile from path."""
     cfg = get_config()
-    queue_new = cfg.maildir / "queue" / "new"
+    # Find which profile this draft belongs to
+    prof = ""
+    rel = str(path.relative_to(cfg.maildir)) if path.is_relative_to(cfg.maildir) else ""
+    parts = rel.split("/")
+    if len(parts) >= 3 and parts[0] in cfg.profiles:
+        prof = parts[0]
+    queue_new = cfg.profile_path(prof, "queue") / "new"
     queue_new.mkdir(parents=True, exist_ok=True)
     dest = queue_new / path.name
     shutil.move(str(path), str(dest))

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import click
 
+from ..config import get_config
 from ..logging import log_event
 from ..maildir import maildir_transfer
-from ..shared import _resolve_ids
+from ..shared import _detect_profile, _resolve_ids
 
 
 @click.command()
@@ -14,7 +15,8 @@ from ..shared import _resolve_ids
 def archive(ids: tuple[str, ...]) -> None:
     """Move messages to archive.
 
-    Moves from incoming/ to archive/cur/.
+    Detects profile from the message path. Moves to archive/cur/ within
+    the same profile.
 
     Examples:
 
@@ -23,8 +25,11 @@ def archive(ids: tuple[str, ...]) -> None:
     """
     if not ids:
         raise click.UsageError("archive requires at least one message ID or - for stdin")
+    cfg = get_config()
     files = _resolve_ids(ids)
     for f in files:
-        maildir_transfer(f, "archive")
+        prof = _detect_profile(f, cfg)
+        dst = f"{prof}/archive" if prof else "archive"
+        maildir_transfer(f, dst)
         click.echo(f"Archived: {f.name}")
     log_event("mail:archive", str(len(files)))

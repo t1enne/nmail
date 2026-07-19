@@ -120,11 +120,16 @@ nmail search --format ids subject:newsletter \
 ## Archiving and Trashing
 
 ```bash
-# Archive by age
+# Archive by age (flat mode)
 find ~/Mail/incoming/cur -mtime +30 | xargs nmail archive
+
+# Archive by age (profile-aware)
+find ~/Mail/personal/incoming/cur -mtime +30 | xargs nmail archive
+find ~/Mail/work/incoming/cur -mtime +30 | xargs nmail archive
 
 # Trash old sent mail
 find ~/Mail/sent/cur -mtime +365 | xargs nmail trash
+find ~/Mail/personal/sent/cur -mtime +365 | xargs nmail trash
 
 # Empty trash older than 30 days
 nmail trash --age 30 --force
@@ -308,12 +313,15 @@ function nmail-fzf() {
 ```bash
 # Search all mail with ripgrep
 function nmail-grep() {
+  # Single profile
   rg -l "$1" ~/Mail/incoming/ ~/Mail/archive/ ~/Mail/sent/
+  # Multi-profile: add ~/Mail/personal/ ~/Mail/work/
+  rg -l "$1" ~/Mail/*/incoming/ ~/Mail/*/archive/ ~/Mail/*/sent/
 }
 
 # fzf with rg
 function nmail-fzf-grep() {
-  rg -l "$1" ~/Mail/incoming/ ~/Mail/archive/ ~/Mail/sent/ \
+  rg -l "$1" ~/Mail/*/incoming/ ~/Mail/*/archive/ ~/Mail/*/sent/ \
     | while read f; do
         subj=$(grep -m1 '^Subject:' "$f" | sed 's/^Subject: //')
         printf '%s\t%s\n' "$subj" "$f"

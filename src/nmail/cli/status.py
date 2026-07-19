@@ -7,7 +7,9 @@ import time
 
 import click
 
-from ..maildir import MAILDIR_SUBDIRS, maildir_list_new, maildir_total
+from ..config import get_config
+from ..constants import INCOMING, MAILDIR_SUBDIRS
+from ..maildir import maildir_list_new, maildir_total
 from ..notmuch import notmuch_available, notmuch_count
 
 
@@ -34,18 +36,45 @@ def status(as_json: bool, watch_mode: bool) -> None:
 
 
 def _status_print(as_json: bool) -> None:
-    stats: dict[str, dict[str, int]] = {
-        d: {"total": maildir_total(d), "new": len(maildir_list_new(d))} for d in MAILDIR_SUBDIRS
-    }
-    # Include notmuch unread count for incoming folder
-    if notmuch_available():
-        unread = notmuch_count("tag:unread")
-        stats["incoming"]["unread"] = unread
+    cfg = get_config()
+    profiles = cfg.profiles if cfg.profiles else [""]
+
+    stats: dict[str, dict[str, dict[str, int]]] = {}
+    flat_stats: dict[str, dict[str, int]] = {}
+
+    for prof in profiles:
+        profile_stats: dict[str, dict[str, int]] = {}
+        for d in MAILDIR_SUBDIRS:
+            path_key = f"{prof}/{d}" if prof else d
+            profile_stats[d] = {
+                "total": maildir_total(path_key),
+                "new": len(maildir_list_new(path_key)),
+            }
+        # Include notmuch unread count
+        if notmuch_available():
+            # notmuch doesn't need profile path — it indexes everything
+            unread = notmuch_count("tag:unread")
+            profile_stats[INCOMING]["unread"] = unread
+
+        if prof:
+            stats[prof] = profile_stats
+        else:
+            flat_stats = profile_stats
+
     if as_json:
-        click.echo(json.dumps(stats))
+        click.echo(json.dumps(stats if profiles[0] else flat_stats))
     else:
-        for name, s in stats.items():
-            line = f"{name:12s}  {s['total']:4d} total  {s['new']:4d} new"
-            if "unread" in s:
-                line += f"  {s['unread']:4d} unread"
-            click.echo(line)
+        if profiles[0]:
+            for prof_name, pstats in stats.items():
+                click.echo(f"\n[{prof_name}]")
+                for name, s in pstats.items():
+                    line = f"  {name:12s}  {s['total']:4d} total  {s['new']:4d} new"
+                    if "unread" in s:
+                        line += f"  {s['unread']:4d} unread"
+                    click.echo(line)
+        else:
+            for name, s in flat_stats.items():
+                line = f"{name:12s}  {s['total']:4d} total  {s['new']:4d} new"
+                if "unread" in s:
+                    line += f"  {s['unread']:4d} unread"
+                click.echo(line)

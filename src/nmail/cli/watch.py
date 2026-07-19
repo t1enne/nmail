@@ -18,7 +18,7 @@ from ..logging import log_event
 def watch(once: bool, no_hooks: bool) -> None:
     """Watch Maildir for new mail and fire events.
 
-    Monitors incoming/new/. Uses inotifywait if available,
+    Monitors incoming/new/ for each profile. Uses inotifywait if available,
     falls back to polling every 5 seconds.
 
     Examples:
@@ -27,21 +27,31 @@ def watch(once: bool, no_hooks: bool) -> None:
     nmail watch --once
     nmail watch --no-hooks
     """
-    cfg = get_config()
-    maildir = cfg.maildir
+    new_dirs = _new_dirs()
 
     if once:
-        _watch_once(maildir)
+        _watch_once(new_dirs)
         return
 
     if not _has_inotifywait():
         click.echo("nmail watch: inotifywait not found (install inotify-tools)", err=True)
         seen: set[str] = set()
         while True:
-            _poll_maildir(maildir, seen, no_hooks)
+            _poll_maildir(new_dirs, seen, no_hooks)
             time.sleep(5)
     else:
-        _inotify_watch(maildir, no_hooks)
+        _inotify_watch(new_dirs, no_hooks)
+
+
+def _new_dirs() -> list[Path]:
+    cfg = get_config()
+    profiles = cfg.profiles if cfg.profiles else [""]
+    dirs: list[Path] = []
+    for prof in profiles:
+        d = cfg.profile_path(prof, "incoming") / "new"
+        d.mkdir(parents=True, exist_ok=True)
+        dirs.append(d)
+    return dirs
 
 
 def _has_inotifywait() -> bool:
@@ -50,38 +60,42 @@ def _has_inotifywait() -> bool:
     return shutil.which("inotifywait") is not None
 
 
-def _watch_once(maildir: Path) -> None:
-    new_dir = maildir / "incoming" / "new"
-    count = len(list(new_dir.iterdir())) if new_dir.exists() else 0
-    click.echo(f"{count} new messages")
+def _watch_once(new_dirs: list[Path]) -> None:
+    total = 0
+    for d in new_dirs:
+        count = len(list(d.iterdir())) if d.exists() else 0
+        total += count
+    click.echo(f"{total} new messages")
 
 
-def _poll_maildir(maildir: Path, seen: set[str], no_hooks: bool) -> None:
-    new_dir = maildir / "incoming" / "new"
-    if not new_dir.exists():
-        return
-    for p in new_dir.iterdir():
-        if p.name not in seen:
-            seen.add(p.name)
-            click.echo(f"New: {p.name}")
-            if not no_hooks:
-                log_event("mail:new", str(p))
+def _poll_maildir(new_dirs: list[Path], seen: set[str], no_hooks: bool) -> None:
+    for d in new_dirs:
+        if not d.exists():
+            continue
+        for p in d.iterdir():
+            if p.name not in seen:
+                seen.add(p.name)
+                click.echo(f"New: {p.name}")
+                if not no_hooks:
+                    log_event("mail:new", str(p))
 
 
-def _inotify_watch(maildir: Path, no_hooks: bool) -> None:
+def _inotify_watch(new_dirs: list[Path], no_hooks: bool) -> None:
     seen: set[str] = set()
-    new_dir = maildir / "incoming" / "new"
-    if new_dir.exists():
-        for p in new_dir.iterdir():
-            seen.add(p.name)
+    for d in new_dirs:
+        if d.exists():
+            for p in d.iterdir():
+                seen.add(p.name)
 
-    incoming_new = str(maildir / "incoming" / "new")
-    if not Path(incoming_new).exists():
-        Path(incoming_new).mkdir(parents=True, exist_ok=True)
+    if not new_dirs:
+        return
 
     try:
+        # Watch all new/ dirs with inotifywait
+        args = ["inotifywait", "-m", "-e", "create", "-e", "moved_to", "--format", "%f"]
+        args.extend(str(d) for d in new_dirs)
         proc = subprocess.Popen(
-            ["inotifywait", "-m", "-e", "create", "-e", "moved_to", "--format", "%f", incoming_new],
+            args,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
@@ -92,6 +106,6 @@ def _inotify_watch(maildir: Path, no_hooks: bool) -> None:
                 seen.add(fname)
                 click.echo(f"New: {fname}")
                 if not no_hooks:
-                    log_event("mail:new", str(maildir / "incoming" / "new" / fname))
+                    log_event("mail:new", fname)
     except KeyboardInterrupt:
         pass

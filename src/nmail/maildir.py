@@ -23,26 +23,54 @@ FLAG_MAP: Final = {"flagged": "F", "replied": "R", "seen": "S", "trashed": "T", 
 FLAG_REVERSE: Final = {v: k for k, v in FLAG_MAP.items()}
 
 
-def _maildir_sub(base: Path, sub: str) -> Path:
-    return base / sub
+def ensure_maildir(profile: str | None = None) -> None:
+    """Count messages in a maildir.
 
+    directory can be:
+      'incoming'        — flat-mode subdir
+      'work/incoming'   — explicit profile/subdir
+      'work'            — bare profile name (counts all subdirs)
 
-def ensure_maildir() -> None:
+    Note: If a profile name collides with a subdir name (e.g., a profile
+    named 'incoming'), the profile branch wins. Avoid naming profiles
+    after subdirs.
+    """
     cfg = get_config()
-    base = cfg.maildir
-    for d in MAILDIR_SUBDIRS:
-        for sf in MAILDIR_SUBFOLDERS:
-            (base / d / sf).mkdir(parents=True, exist_ok=True)
+    profiles: list[str] = []
+    if profile:
+        profiles = [profile]
+    elif cfg.profiles:
+        profiles = cfg.profiles
+    else:
+        profiles = [""]
+
+    for prof in profiles:
+        base = cfg.maildir / prof if prof else cfg.maildir
+        for d in MAILDIR_SUBDIRS:
+            for sf in MAILDIR_SUBFOLDERS:
+                (base / d / sf).mkdir(parents=True, exist_ok=True)
 
 
-def maildir_move(src: Path, dst_dir: str) -> Path:
-    """Move file into a Maildir directory atomically (via tmp→new)."""
+def _parse_dir(directory: str) -> tuple[str, str]:
+    """Parse 'profile/subdir' or 'subdir' into (profile, subdir)."""
+    if "/" in directory:
+        a, b = directory.split("/", 1)
+        return (a, b)
+    return ("", directory)
+
+
+def maildir_move(src: Path, directory: str) -> Path:
+    """Move file into a Maildir directory atomically (via tmp→new).
+
+    directory can be 'incoming' (flat), 'work/incoming' (profile-relative),
+    or 'personal/incoming'.
+    """
     cfg = get_config()
-    target = cfg.maildir / dst_dir
+    prof, sub = _parse_dir(directory)
+    target = cfg.profile_path(prof, sub)
     dest_dir = target / "new"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / src.name
-    # rename is atomic on same filesystem
     os.rename(src, dest)
     _refresh_notmuch()
     return dest
@@ -72,11 +100,7 @@ def _set_suffix(path: Path, flags: str) -> Path:
 
 
 def _refresh_notmuch() -> None:
-    """Incrementally re-index notmuch after a file rename/move.
-
-    Keeps notmuch's index in sync with Maildir so searches and
-    counts don't drift between syncs.
-    """
+    """Incrementally re-index notmuch after a file rename/move."""
     cfg = get_config()
     if not cfg.notmuch_enabled:
         return
@@ -123,24 +147,47 @@ def mark_read(path: Path) -> Path:
     if not path.is_file():
         return path
     cfg = get_config()
-    for subdir in MAILDIR_SUBDIRS:
-        new_dir = cfg.maildir / subdir / "new"
-        cur_dir = cfg.maildir / subdir / "cur"
-        try:
-            if path.relative_to(new_dir):
-                cur_dir.mkdir(parents=True, exist_ok=True)
-                dest = cur_dir / path.name
-                os.rename(path, dest)
-                _refresh_notmuch()
-                return add_flag(dest, "seen")
-        except ValueError:
-            continue
+    # Check all profiles' new/ dirs
+    profiles = cfg.profiles if cfg.profiles else [""]
+    for prof in profiles:
+        base = cfg.profile_path(prof)
+        for subdir in MAILDIR_SUBDIRS:
+            new_dir = base / subdir / "new"
+            cur_dir = base / subdir / "cur"
+            try:
+                if path.relative_to(new_dir):
+                    cur_dir.mkdir(parents=True, exist_ok=True)
+                    dest = cur_dir / path.name
+                    os.rename(path, dest)
+                    _refresh_notmuch()
+                    return add_flag(dest, "seen")
+            except ValueError:
+                continue
     _refresh_notmuch()
     return add_flag(path, "seen")
 
 
 def maildir_count(directory: str) -> int:
+    """Count messages in a maildir.
+
+    directory can be 'incoming' (flat), 'work/incoming', or 'personal'.
+    When a bare profile name is given (e.g. 'work'), counts all subdirs.
+    """
     cfg = get_config()
+    if "/" in directory:
+        prof, sub = directory.split("/", 1)
+        base = cfg.profile_path(prof, sub)
+        new = len(list((base / "new").iterdir())) if (base / "new").exists() else 0
+        cur = len(list((base / "cur").iterdir())) if (base / "cur").exists() else 0
+        return new + cur
+    # Bare profile name (e.g. 'work') or flat subdir (e.g. 'incoming')
+    # Check if it's a profile
+    if cfg.profiles and directory in cfg.profiles:
+        total = 0
+        for sub in MAILDIR_SUBDIRS:
+            total += maildir_count(f"{directory}/{sub}")
+        return total
+    # Flat subdir
     d = cfg.maildir / directory
     new = len(list((d / "new").iterdir())) if (d / "new").exists() else 0
     cur = len(list((d / "cur").iterdir())) if (d / "cur").exists() else 0
@@ -148,19 +195,29 @@ def maildir_count(directory: str) -> int:
 
 
 def maildir_list_new(directory: str) -> list[Path]:
+    """List new messages. Supports 'profile/subdir' or bare subdir."""
     cfg = get_config()
-    d = cfg.maildir / directory / "new"
+    if "/" in directory:
+        prof, sub = directory.split("/", 1)
+        d = cfg.profile_path(prof, sub) / "new"
+    else:
+        d = cfg.maildir / directory / "new"
     if not d.exists():
         return []
     return sorted(d.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 def maildir_list_all(directory: str) -> list[Path]:
+    """List all messages. Supports 'profile/subdir' or bare subdir."""
     cfg = get_config()
-    d = cfg.maildir / directory
+    if "/" in directory:
+        prof, sub = directory.split("/", 1)
+        base = cfg.profile_path(prof, sub)
+    else:
+        base = cfg.maildir / directory
     result: list[Path] = []
     for sf in ("new", "cur"):
-        p = d / sf
+        p = base / sf
         if p.exists():
             result.extend(p.iterdir())
     return sorted(result, key=lambda p: p.stat().st_mtime, reverse=True)
@@ -171,7 +228,10 @@ def maildir_total(directory: str) -> int:
 
 
 def maildir_transfer(src: Path, dst_dir: str) -> Path:
-    """Move message between Maildirs, preserving flags."""
+    """Move message between Maildirs, preserving flags.
+
+    dst_dir can be 'archive', 'sent', 'trash', 'personal/archive', etc.
+    """
     flags = _flag_suffix(src)
     dest = maildir_move(src, dst_dir)
     if flags:

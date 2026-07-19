@@ -101,7 +101,7 @@ retry_delay = 300
 
 [sync]
 tool = "mbsync"
-accounts = []
+accounts = ["personal"]
 interval = 300
 
 [notmuch]
@@ -111,6 +111,16 @@ command = "notmuch"
 [hooks]
 dir = "~/.config/nmail/hooks.d/"
 enabled = true
+
+# For multiple profiles (e.g. personal + work), add:
+# [profiles]
+# default = "personal"
+# [profiles.personal]
+# sync_account = "personal"
+# smtp_account = "personal"
+# [profiles.work]
+# sync_account = "work"
+# smtp_account = "work"
 
 ```
 
@@ -143,6 +153,7 @@ echo "Subject: test" | msmtp -a personal you@example.com
 ### 4.3 ~/.mbsyncrc (IMAP)
 
 ```
+# Single profile (flat mode)
 IMAPAccount personal
 Host imap.example.com
 User you@example.com
@@ -153,17 +164,21 @@ IMAPStore personal-remote
 Account personal
 
 MaildirStore personal-local
-Path ~/Mail/incoming/
-Inbox ~/Mail/incoming/
+Path ~/Mail/
+Inbox ~/Mail/inbox
+SubFolders Verbatim
 
 Channel personal
 Far :personal-remote:
 Near :personal-local:
-Patterns *
-Create Near
-Sync All
+Patterns "INBOX" "[Gmail]/Sent Mail" "[Gmail]/Drafts" "[Gmail]/Trash"
+Create Both
 Expunge Both
+SyncState *
 ```
+
+For multiple profiles, each gets its own subdirectory (e.g. `~/Mail/personal/`, `~/Mail/work/`).
+See [CONFIG.md](../CONFIG.md#3-imap-mbsync) for the multi-profile mbsync example.
 
 **Permissions:** `chmod 600 ~/.mbsyncrc`
 
@@ -272,7 +287,7 @@ nmail search --interactive tag:unread
 
 ```bash
 nmail open 182                    # by ID
-nmail open ~/Mail/incoming/new/... # by path
+nmail open ~/Mail/personal/incoming/new/... # by path (profile-aware)
 nmail open --headers-only 182
 ```
 

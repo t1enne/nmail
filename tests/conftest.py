@@ -21,6 +21,8 @@ def maildir_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         for sf in MAILDIR_SUBFOLDERS:
             (base / subdir / sf).mkdir(parents=True)
     monkeypatch.setattr(Config, "maildir", property(lambda _: base))
+    monkeypatch.setattr(Config, "profiles", property(lambda _self: []))
+    monkeypatch.setattr(Config, "profile", property(lambda _self: None))
     return base
 
 
@@ -37,7 +39,7 @@ def config_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.fixture
 def patched_config(monkeypatch: pytest.MonkeyPatch, maildir_tree: Path) -> Config:
-    """Return a Config singleton whose maildir and config_home are patched.
+    """Return a Config singleton with flat-mode defaults.
 
     Also patches the module-level _config in nmail.config so get_config()
     returns this instance everywhere. Resets _data so each test gets fresh config.
@@ -47,6 +49,9 @@ def patched_config(monkeypatch: pytest.MonkeyPatch, maildir_tree: Path) -> Confi
     cfg = Config()
     cfg._data = None  # force fresh load each test
     monkeypatch.setattr(nmail.config, "_config", cfg)
+    # Default to flat mode (no profiles) so tests don't depend on real config
+    monkeypatch.setattr(Config, "profiles", property(lambda _self: []))
+    monkeypatch.setattr(Config, "profile", property(lambda _self: None))
     return cfg
 
 

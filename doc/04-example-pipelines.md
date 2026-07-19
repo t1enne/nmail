@@ -1,6 +1,9 @@
 # Example Shell Pipelines
 
 > All examples assume `~/Mail/` exists and `nmail` is in `PATH`.
+>
+> For multi-profile setups (`~/Mail/personal/`, `~/Mail/work/`), replace flat paths like
+> `~/Mail/incoming/` with `~/Mail/<profile>/incoming/` or use globs like `~/Mail/*/incoming/`.
 
 ---
 

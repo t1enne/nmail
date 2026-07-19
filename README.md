@@ -68,26 +68,26 @@ nmail status
 
 ## Commands
 
-| Command          | Description                      |
-| ---------------- | -------------------------------- |
-| `nmail compose`  | Create/edit draft                |
-| `nmail render`   | Markdown → RFC5322 MIME          |
-| `nmail send`     | Send queued mail via msmtp       |
-| `nmail sync`     | Sync Maildir via mbsync          |
-| `nmail watch`    | Watch Maildir, fire events       |
-| `nmail open`     | Open message in pager            |
-| `nmail reply`    | Create reply draft               |
-| `nmail forward`  | Create forward draft             |
-| `nmail search`   | Search mail (notmuch or ripgrep) |
-| `nmail tag`      | Add/remove notmuch tags          |
-| `nmail archive`  | Move to archive                  |
-| `nmail trash`    | Move to trash / empty trash      |
-| `nmail contacts` | Extract/query contacts           |
-| `nmail template` | Manage draft templates           |
-| `nmail status`   | Mailbox statistics               |
-| `nmail log`      | Query activity log               |
-| `nmail attach`   | Manage saved attachments         |
-| `nmail hook`     | Trigger hook scripts             |
+| Command          | Description                                   |
+| ---------------- | --------------------------------------------- |
+| `nmail compose`  | Create/edit draft                             |
+| `nmail render`   | Markdown → RFC5322 MIME                       |
+| `nmail send`     | Send queued mail via msmtp                    |
+| `nmail sync`     | Sync Maildir via mbsync                       |
+| `nmail watch`    | Watch Maildir, fire events                    |
+| `nmail open`     | Open message in pager                         |
+| `nmail reply`    | Create reply draft                            |
+| `nmail forward`  | Create forward draft                          |
+| `nmail search`   | Search mail (notmuch or ripgrep)              |
+| `nmail tag`      | Add/remove notmuch tags                       |
+| `nmail archive`  | Move to archive (profile-aware)               |
+| `nmail trash`    | Move to trash / empty trash (profile-aware)   |
+| `nmail contacts` | Extract/query contacts                        |
+| `nmail template` | Manage draft templates                        |
+| `nmail status`   | Mailbox statistics (per-profile)              |
+| `nmail log`      | Query activity log                            |
+| `nmail attach`   | Manage saved attachments                      |
+| `nmail hook`     | Trigger hook scripts                          |
 
 ## Search Syntax
 
@@ -160,6 +160,47 @@ John
 
 ## Directory Structure
 
+### Single profile
+
+```
+~/Mail/
+├── incoming/{cur,new,tmp}/   # Synced inbox
+├── archive/                  # Archived messages
+├── drafts/                   # Drafts in progress
+├── sent/                     # Sent mail
+├── trash/                    # Trash
+├── queue/                    # Outgoing queue
+├── templates/                # Draft templates
+├── attachments/              # Saved attachments
+└── logs/                     # Activity logs
+```
+
+### Multiple profiles
+
+Each profile gets its own subdirectory under `~/Mail/`:
+
+```
+~/Mail/
+├── personal/
+│   ├── incoming/   # Personal inbox
+│   ├── sent/       # Personal sent
+│   ├── drafts/
+│   ├── trash/
+│   ├── archive/
+│   └── queue/
+├── work/
+│   ├── incoming/   # Work inbox
+│   ├── sent/       # Work sent
+│   ├── drafts/
+│   ├── trash/
+│   └── queue/
+└── .notmuch/       # notmuch index (shared)
+```
+
+`nmail status` shows per-profile stats. `nmail archive`, `nmail trash`, `nmail send`
+detect the profile from the message path. Set the active profile via
+`NM_PROFILE` env or `[profiles].default` in config.
+
 See [CONFIG.md](CONFIG.md#7-directory-layout-after-setup) for the full layout.
 
 ## Configuration
@@ -172,7 +213,7 @@ Quick reference:
 - `~/.msmtprc` — SMTP relay config (`chmod 600`)
 - `~/.mbsyncrc` — IMAP sync config (`chmod 600`)
 - `$EDITOR` / `$VISUAL` — editor for composing (read from env, not config)
-- `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_SMTP_CMD`, `NM_CONFIG_HOME` — env overrides
+- `NM_MAILDIR`, `NM_PAGER`, `NM_FROM`, `NM_PROFILE`, `NM_SMTP_CMD`, `NM_CONFIG_HOME` — env overrides
 
 ## Development
 

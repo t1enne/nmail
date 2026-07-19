@@ -35,19 +35,24 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
     nmail send --all
     """
     cfg = get_config()
-    queue_dir = cfg.maildir / "queue"
-    to_send: list[Path] = []
-    if msg_id:
-        for sf in ("new", "cur"):
-            p = queue_dir / sf / msg_id
-            if p.exists():
-                to_send.append(p)
-                break
-    else:
-        new_dir = queue_dir / "new"
-        if new_dir.exists():
-            all_msgs = sorted(new_dir.iterdir(), key=lambda x: x.stat().st_mtime)
-            to_send = all_msgs if send_all else all_msgs[:1]
+    profiles = cfg.profiles if cfg.profiles else [""]
+
+    to_send: list[tuple[Path, str]] = []  # (path, profile)
+    for prof in profiles:
+        qdir = cfg.profile_path(prof, "queue") if prof else cfg.maildir / "queue"
+        if msg_id:
+            for sf in ("new", "cur"):
+                p = qdir / sf / msg_id
+                if p.exists():
+                    to_send.append((p, prof))
+                    break
+        else:
+            new_dir = qdir / "new"
+            if new_dir.exists():
+                all_msgs = sorted(new_dir.iterdir(), key=lambda x: x.stat().st_mtime)
+                for m in all_msgs if send_all else all_msgs[:1]:
+                    to_send.append((m, prof))
+
     if not to_send:
         click.echo("No messages to send.")
         return
@@ -59,7 +64,7 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
 
     sent = 0
     failed = 0
-    for msg_path in to_send:
+    for msg_path, prof in to_send:
         rendered = render_message(msg_path, "mime")
         if dry_run:
             click.echo(f"Would send: {msg_path.name}")
@@ -72,7 +77,8 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
                     smtp_cmd.split(), input=rendered, capture_output=True, text=True, timeout=60
                 )
                 if proc.returncode == 0:
-                    maildir_transfer(msg_path, "sent")
+                    dst = f"{prof}/sent" if prof else "sent"
+                    maildir_transfer(msg_path, dst)
                     log_event("mail:sent", str(msg_path))
                     click.echo(f"Sent: {msg_path.name}")
                     sent += 1
@@ -84,15 +90,15 @@ def send(dry_run: bool, msg_id: str | None, retry: int, send_all: bool) -> None:
                 if attempt < retry - 1:
                     time.sleep(2)
         if not ok:
-            _move_to_queue_cur(msg_path)
+            _move_to_queue_cur(msg_path, prof)
             log_event("mail:error", str(msg_path))
             click.echo(f"Failed: {msg_path.name}", err=True)
             failed += 1
     click.echo(f"Sent: {sent}, Failed: {failed}")
 
 
-def _move_to_queue_cur(path: Path) -> None:
-
-    cur = get_config().maildir / "queue" / "cur"
+def _move_to_queue_cur(path: Path, profile: str = "") -> None:
+    cfg = get_config()
+    cur = cfg.profile_path(profile, "queue") / "cur" if profile else cfg.maildir / "queue" / "cur"
     cur.mkdir(parents=True, exist_ok=True)
     shutil.move(str(path), str(cur / path.name))

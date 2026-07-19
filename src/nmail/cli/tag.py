@@ -16,17 +16,20 @@ def _maildir_to_msgid(id_str: str) -> str | None:
     """Convert a Maildir filename stem to a notmuch message-ID by extracting
     the Message-ID header. Returns None if file can't be found/read."""
     cfg = get_config()
-    for subdir in ("incoming", "archive", "sent"):
-        for mdir_sub in ("cur", "new", "tmp"):
-            d = cfg.maildir / subdir / mdir_sub
-            if not d.exists():
-                continue
-            for p in d.glob(f"{id_str}*"):
-                if not p.is_file():
+    profiles = cfg.profiles if cfg.profiles else [""]
+    for prof in profiles:
+        base = cfg.profile_path(prof)
+        for subdir in ("incoming", "archive", "sent"):
+            for mdir_sub in ("cur", "new", "tmp"):
+                d = base / subdir / mdir_sub
+                if not d.exists():
                     continue
-                mid = extract_header(p, "Message-ID")
-                if mid:
-                    return mid.strip("<>")
+                for p in d.glob(f"{id_str}*"):
+                    if not p.is_file():
+                        continue
+                    mid = extract_header(p, "Message-ID")
+                    if mid:
+                        return mid.strip("<>")
     return None
 
 

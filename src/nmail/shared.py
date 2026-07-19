@@ -6,7 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .config import get_config
+from .config import Config, get_config
+from .constants import MAILDIR_SUBDIRS
 from .notmuch import resolve_id
 
 
@@ -37,11 +38,26 @@ def _set_header(content: str, header: str, value: str) -> str:
 def _all_maildir_files() -> list[str]:
     from .maildir import maildir_list_all
 
+    cfg = get_config()
     files: list[str] = []
-    for d in ("incoming", "archive", "sent"):
-        for p in maildir_list_all(d):
-            files.append(str(p))
+    profiles = cfg.profiles if cfg.profiles else [""]
+    for prof in profiles:
+        for d in MAILDIR_SUBDIRS:
+            for p in maildir_list_all(f"{prof}/{d}" if prof else d):
+                files.append(str(p))
     return files
+
+
+def _detect_profile(path: Path, cfg: Config) -> str:
+    """Detect profile from a mail file path."""
+    try:
+        rel = str(path.relative_to(cfg.maildir))
+        parts = rel.split("/")
+        if len(parts) >= 3 and parts[0] in cfg.profiles:
+            return parts[0]
+    except ValueError:
+        pass
+    return ""
 
 
 def _resolve_ids(ids: tuple[str, ...]) -> list[Path]:
