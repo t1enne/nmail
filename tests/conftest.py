@@ -10,8 +10,6 @@ from nmail.config import Config
 from nmail.constants import (
     MAILDIR_SUBDIRS,
     MAILDIR_SUBFOLDERS,
-    NM_CONFIG_HOME,
-    NM_MAILDIR,
 )
 
 

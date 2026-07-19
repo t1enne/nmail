@@ -1,14 +1,13 @@
 """Tests for src/nmail/drafts.py — draft creation, validation, queueing."""
 
 from __future__ import annotations
-from nmail.config import Config
 
 from pathlib import Path
 
 import pytest
 
+from nmail.config import Config
 from nmail.drafts import create_draft, queue_draft, validate_draft
-
 
 # ── create_draft ─────────────────────────────────────────────────────────────
 

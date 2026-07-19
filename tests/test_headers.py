@@ -8,7 +8,6 @@ import pytest
 
 from nmail.headers import extract_body, extract_header, extract_headers_block
 
-
 # ── extract_header ───────────────────────────────────────────────────────────
 
 

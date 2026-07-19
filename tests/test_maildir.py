@@ -6,7 +6,6 @@ ensure_maildir, maildir_new_id uniqueness.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,6 @@ from nmail.maildir import (
     mark_read,
     remove_flag,
 )
-
 
 # ── maildir_new_id ───────────────────────────────────────────────────────────
 
@@ -49,9 +47,8 @@ def test_ensure_maildir_creates_structure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     base = tmp_path / "FreshMail"
-    from nmail.config import Config
-
     import nmail.config
+    from nmail.config import Config
 
     cfg = Config()
     monkeypatch.setattr(Config, "maildir", property(lambda self: base))
@@ -135,7 +132,7 @@ def test_add_flag_multiple(maildir_tree: Path) -> None:
     assert has_flag(f, "flagged")
     assert has_flag(f, "replied")
     # Flags should be sorted
-    assert "FRS" in f.name or "FRS" == _flag_suffix_for(f)
+    assert "FRS" in f.name or _flag_suffix_for(f) == "FRS"
 
 
 def test_remove_flag(maildir_tree: Path) -> None:

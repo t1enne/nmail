@@ -58,7 +58,7 @@ def contacts(update: bool, interactive: bool, fmt: str, query: str | None) -> No
     if fmt == "json":
         click.echo(json.dumps([{"name": n, "email": e, "count": c} for n, e, c in entries]))
     elif fmt == "email":
-        for name, email, count in entries:
+        for _, email, _ in entries:
             click.echo(email)
     else:
         for name, email, count in entries:
@@ -136,11 +136,15 @@ def _contacts_interactive(entries: list[tuple[str, str, int]]) -> None:
             [
                 "fzf",
                 "--multi",
-                "--delimiter", "\t",
+                "--delimiter",
+                "\t",
                 "--with-nth=1",
-                "--preview", "echo {2}",
-                "--preview-window", "bottom:1",
-                "--header", "Tab to select, Enter to confirm",
+                "--preview",
+                "echo {2}",
+                "--preview-window",
+                "bottom:1",
+                "--header",
+                "Tab to select, Enter to confirm",
             ],
             input=fzf_input,
             stdin=tty_fd,

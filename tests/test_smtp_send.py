@@ -7,8 +7,6 @@ import sys
 import pytest
 from click.testing import CliRunner
 
-import nmail.cli.send  # force-load the module
-
 _send_mod = sys.modules["nmail.cli.send"]
 _send_fn = _send_mod.send  # the Click Command
 

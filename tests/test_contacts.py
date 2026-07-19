@@ -6,7 +6,6 @@ import pytest
 
 from nmail.cli.contacts import _normalize_id
 
-
 # ── MIME-encoded word decoding ────────────────────────────────────────────────
 
 

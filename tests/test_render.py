@@ -6,7 +6,6 @@ boundary generation, header transfer, missing date/message-id auto-fill.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -19,7 +18,6 @@ from nmail.render import (
     parse_draft,
     render_message,
 )
-
 
 # ── parse_draft ──────────────────────────────────────────────────────────────
 
